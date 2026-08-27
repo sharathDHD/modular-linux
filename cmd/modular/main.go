@@ -130,15 +130,18 @@ func cmdInstall(reg *Registry, args []string) {
 	out, _ := yaml.Marshal(plan)
 	fmt.Print(string(out))
 	fmt.Println("delegating install to Python orchestrator")
-	pyBin, err := findPythonOrchestrator()
+	root, err := findInstallerRoot()
 	if err != nil {
 		fatal(err)
 	}
-	pyArgs := []string{pyBin, configPath,
+	// Run the orchestrator as a module from the project root so its
+	// `engine`/`installer` imports resolve (a bare `python3
+	// orchestrator.py` from another cwd cannot import them).
+	cmd := exec.Command("python3", "-m",
+		"installer.installation.orchestrator", configPath,
 		"--device", device,
-		"--non-interactive",
-	}
-	cmd := exec.Command("python3", pyArgs...)
+		"--non-interactive")
+	cmd.Dir = root
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
@@ -148,20 +151,32 @@ func cmdInstall(reg *Registry, args []string) {
 	}
 }
 
-func findPythonOrchestrator() (string, error) {
+// findInstallerRoot locates the directory that contains the
+// installer/ tree. Checks, in order: next to the executable (ISO
+// layout: /opt/modular), one and two levels above it (repo layout:
+// bin/modular), the current directory, and the fixed ISO path.
+func findInstallerRoot() (string, error) {
 	exe, _ := os.Executable()
+	exeDir := filepath.Dir(exe)
 	candidates := []string{
-		filepath.Join(filepath.Dir(exe), "..", "..",
-			"installer", "installation", "orchestrator.py"),
-		"installer/installation/orchestrator.py",
+		exeDir,
+		filepath.Join(exeDir, ".."),
+		filepath.Join(exeDir, "..", ".."),
+		".",
+		"/opt/modular",
 	}
 	for _, p := range candidates {
-		if _, err := os.Stat(p); err == nil {
-			return p, nil
+		abs, err := filepath.Abs(p)
+		if err != nil {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(
+			abs, "installer", "installation", "orchestrator.py")); err == nil {
+			return abs, nil
 		}
 	}
 	return "", fmt.Errorf(
-		"cannot find Python orchestrator; tried %v", candidates)
+		"cannot locate the installer tree (looked in %v)", candidates)
 }
 
 func fatal(err error) {
@@ -377,7 +392,7 @@ func gpuVendorFromDetection() string {
 	}
 	vendors := map[string]bool{}
 	for _, g := range hw.GPU {
-	 vendors[g.Vendor] = true
+		vendors[g.Vendor] = true
 	}
 	for _, want := range []string{"nvidia", "amd", "intel"} {
 		if vendors[want] {

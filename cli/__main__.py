@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import yaml
 
 from engine.configuration import ModularConfiguration
+from engine.constants import KNOWN_HARDWARE, KNOWN_ROLES
 from engine.errors import ModularError
 from engine.packages import build_plan
 from engine.profiles import default_registry
@@ -79,10 +80,12 @@ def main(argv: list[str]) -> int:
             if arg.startswith("desktop.") or arg in ("kde", "gnome", "xfce",
                                                      "hyprland"):
                 desktop = arg.removeprefix("desktop.")
-            elif arg.startswith("role.") or arg in (
-                    "general", "developer", "ai-ml", "gaming", "creator",
-                    "student", "server", "security"):
+            elif arg.startswith("role.") or arg in KNOWN_ROLES:
                 roles.append(arg if "." in arg else f"role.{arg}")
+            elif arg in KNOWN_HARDWARE:
+                # Bare feature names (audio, wifi, ...) map to the
+                # matching hardware profile, mirroring the Go CLI.
+                hardware.append(f"hardware.{arg}")
             elif "." in arg:
                 hardware.append(arg)
             else:

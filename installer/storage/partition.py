@@ -2,8 +2,12 @@
 
 Automatic UEFI layout:
 
-    p1  EFI System Partition  (fat32, +1G)
+    p1  EFI System Partition  (fat32, +1G, mounted at /boot)
     p2  Linux filesystem      (rest)
+
+The ESP is mounted at /boot (not /boot/efi) because systemd-boot can
+only load kernels from the ESP itself; with the ESP at /boot the
+vmlinuz/initramfs images mkinitcpio writes land directly on the ESP.
 
 All commands are generated and can be inspected before execution; execution
 requires both dry_run=False and confirm=True (explicit user consent).
@@ -12,6 +16,7 @@ requires both dry_run=False and confirm=True (explicit user consent).
 from __future__ import annotations
 
 import shutil
+import subprocess
 from dataclasses import dataclass, field
 
 EFI_SIZE_MIB = 1024
@@ -51,8 +56,9 @@ def mount_commands(root_partition: str, fs: str, efi_partition: str,
 
     The first argument is the *root partition* (e.g. /dev/sda2), not the
     whole device — mounting a raw device on /mnt destroys any existing
-    partition table contents and breaks /boot/efi. The companion
-    Partitioner.commands() always passes plan.root_partition.
+    partition table contents. The ESP is mounted at <root>/boot so both
+    systemd-boot and GRUB find their kernels on the ESP (GRUB reads it
+    via its fat driver, systemd-boot requires it).
     """
     if not root_partition or not efi_partition:
         raise ValueError("both root_partition and efi_partition are required")
@@ -60,14 +66,14 @@ def mount_commands(root_partition: str, fs: str, efi_partition: str,
         raise ValueError("root_partition and efi_partition must differ")
     return [
         ["mount", root_partition, root_mount],
-        ["mkdir", "-p", f"{root_mount}/boot/efi"],
-        ["mount", efi_partition, f"{root_mount}/boot/efi"],
+        ["mkdir", "-p", f"{root_mount}/boot"],
+        ["mount", efi_partition, f"{root_mount}/boot"],
     ]
 
 
 def umount_all(root_mount: str = "/mnt") -> list[list[str]]:
     return [
-        [shutil.which("umount") or "umount", "-R", f"{root_mount}/boot/efi"],
+        [shutil.which("umount") or "umount", "-R", f"{root_mount}/boot"],
         [shutil.which("umount") or "umount", "-R", root_mount],
     ]
 
@@ -141,6 +147,9 @@ class Partitioner:
         plan = self.plan()
         cmds: list[list[str]] = []
         cmds.append(["sfdisk", "--wipe", "always", self.device])
+        # Give udev a moment to create the partition device nodes before
+        # mkfs runs; without this, fast machines can race the kernel.
+        cmds.append(["udevadm", "settle", "--timeout", "10"])
         cmds.append(mkfs_command(self.filesystem, plan.root_partition))
         cmds.append(["mkfs.fat", "-F", "32", plan.efi_partition])
         cmds.extend(mount_commands(plan.root_partition, self.filesystem,
@@ -156,11 +165,16 @@ class Partitioner:
             raise PermissionError(
                 "refusing destructive disk operation without explicit confirmation"
             )
-        import subprocess
 
         commands = self.commands()
         for i, cmd in enumerate(commands):
-            proc = subprocess.run(cmd, capture_output=True, text=True)
+            stdin: str | None = None
+            if cmd[0] == "sfdisk":
+                # sfdisk reads the partition layout description from
+                # stdin; without it it blocks forever waiting for input.
+                stdin = self.plan().sfdisk_script()
+            proc = subprocess.run(cmd, input=stdin, capture_output=True,
+                                  text=True, timeout=120)
             self.log.append(" ".join(cmd))
             if proc.returncode != 0:
                 self.log.append(proc.stderr.strip())
@@ -170,14 +184,13 @@ class Partitioner:
                     if later and later[0] == "mount":
                         self.log.append("rollback: skipping later mount "
                                         + " ".join(later))
-                self._try_umount("/mnt/boot/efi")
+                self._try_umount("/mnt/boot")
                 self._try_umount("/mnt")
                 return proc.returncode
         return 0
 
     @staticmethod
     def _try_umount(target: str) -> None:
-        import subprocess
         try:
             subprocess.run(["umount", "-R", target], capture_output=True,
                            text=True, timeout=10)

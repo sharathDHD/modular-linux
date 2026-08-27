@@ -15,6 +15,42 @@ import subprocess
 SUPPORTED_BOOTLOADERS = ("systemd-boot", "grub")
 SUPPORTED_FILESYSTEMS = ("ext4", "btrfs")
 
+# ESP mount point inside the installed system. systemd-boot can only load
+# kernels from the ESP itself, so the ESP is mounted at /boot and the
+# kernel/initramfs images pacstrap+mkinitcpio write there live on the ESP.
+ESP_MOUNT = "/boot"
+
+_ZONE_RE = re.compile(r"^[A-Za-z0-9_+\-]+(/[A-Za-z0-9_+\-]+)*$")
+_LOCALE_RE = re.compile(
+    r"^[A-Za-z]+(_[A-Za-z]+)?(\.[A-Za-z0-9\-]+)?(@[A-Za-z0-9\-]+)?$")
+_KEYMAP_RE = re.compile(r"^[A-Za-z0-9._+\-]+$")
+_HOSTNAME_RE = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9\-]{0,61}[A-Za-z0-9])?"
+                          r"(\.[A-Za-z0-9]([A-Za-z0-9\-]{0,61}[A-Za-z0-9])?)*$")
+
+
+def _validate_zone(zone: str) -> str:
+    if not zone or not _ZONE_RE.match(zone) or ".." in zone:
+        raise ValueError(f"invalid timezone: {zone!r}")
+    return zone
+
+
+def _validate_locale(locale: str) -> str:
+    if not locale or not _LOCALE_RE.match(locale):
+        raise ValueError(f"invalid locale: {locale!r}")
+    return locale
+
+
+def _validate_keymap(keymap: str) -> str:
+    if not keymap or not _KEYMAP_RE.match(keymap):
+        raise ValueError(f"invalid keymap: {keymap!r}")
+    return keymap
+
+
+def _validate_hostname(hostname: str) -> str:
+    if not hostname or not _HOSTNAME_RE.match(hostname):
+        raise ValueError(f"invalid hostname: {hostname!r}")
+    return hostname
+
 
 def _shell_quote(value: str) -> str:
     """Quote a value so it is safe to embed in a single shell argument.
@@ -51,6 +87,7 @@ def set_timezone(zone: str, root: str = "/mnt") -> list[list[str]]:
     """Symlink /etc/localtime and run hwclock. systemd-based systems also
     accept timedatectl set-timezone, but hwclock is the lower-level
     canonical path and works without a running systemd."""
+    _validate_zone(zone)
     return [
         ["arch-chroot", root, "ln", "-sf",
          f"/usr/share/zoneinfo/{shlex.quote(zone)}", "/etc/localtime"],
@@ -60,6 +97,7 @@ def set_timezone(zone: str, root: str = "/mnt") -> list[list[str]]:
 
 def configure_locale(locale: str, root: str = "/mnt") -> list[list[str]]:
     """Uncomment the chosen locale in /etc/locale.gen and run locale-gen."""
+    _validate_locale(locale)
     cmds: list[list[str]] = []
     pattern = f"^# {re.escape(locale)}"
     cmds.append(["arch-chroot", root, "sed", "-i",
@@ -72,6 +110,7 @@ def configure_locale(locale: str, root: str = "/mnt") -> list[list[str]]:
 
 def set_keymap(keymap: str, root: str = "/mnt") -> list[list[str]]:
     """Write /etc/vconsole.conf for the console keymap."""
+    _validate_keymap(keymap)
     return [
         ["arch-chroot", root, "/bin/sh", "-c",
          f"printf 'KEYMAP=%s\\n' {shlex.quote(keymap)} > /etc/vconsole.conf"],
@@ -82,7 +121,8 @@ def set_hostname(hostname: str, root: str = "/mnt") -> list[list[str]]:
     """Write /etc/hostname and /etc/hosts for the installed system."""
     if not hostname or not hostname.strip():
         raise ValueError("hostname must not be empty")
-    safe = shlex.quote(hostname.strip())
+    hostname = _validate_hostname(hostname.strip())
+    safe = shlex.quote(hostname)
     return [
         ["arch-chroot", root, "/bin/sh", "-c", f"echo {safe} > /etc/hostname"],
         ["arch-chroot", root, "/bin/sh", "-c",
@@ -136,8 +176,12 @@ def user_commands(username: str, full_name: str, password: str,
 
 def execute_step(cmd: list[str], stdin_text: str | None = None,
                  timeout: int | None = None) -> tuple[int, str]:
-    proc = subprocess.run(cmd, input=stdin_text, capture_output=True, text=True,
-                          timeout=timeout)
+    # stdin_text=None would inherit the parent's stdin, which can hang
+    # forever on commands that unexpectedly read input (e.g. chpasswd
+    # when its payload is not attached). Feed an empty, closed stdin
+    # instead so such commands fail fast instead of deadlocking.
+    proc = subprocess.run(cmd, input=stdin_text if stdin_text is not None else "",
+                          capture_output=True, text=True, timeout=timeout)
     output = (proc.stdout or "").strip()
     if proc.returncode != 0 and (proc.stderr or "").strip():
         output = (proc.stderr or "").strip()
@@ -146,12 +190,14 @@ def execute_step(cmd: list[str], stdin_text: str | None = None,
 
 def regenerate_initramfs(kernel: str = "linux",
                          root: str = "/mnt") -> list[list[str]]:
-    """Run mkinitcpio to regenerate the initramfs for the chosen kernel.
+    """Run mkinitcpio to regenerate the initramfs images.
 
     Pacstrap does not always run this for the host kernel; explicit
     regeneration is required for bootloader changes to take effect.
+    `-P` (all presets) is used because `-p <preset>` was deprecated in
+    mkinitcpio v38 and removed in later releases.
     """
-    return [["arch-chroot", root, "mkinitcpio", "-p", shlex.quote(kernel)]]
+    return [["arch-chroot", root, "mkinitcpio", "-P"]]
 
 
 def bootloader_commands(bootloader: str,
@@ -164,20 +210,59 @@ def bootloader_commands(bootloader: str,
     """
     if bootloader == "systemd-boot":
         return [
-            ["arch-chroot", root, "bootctl", "install"],
+            ["arch-chroot", root, "bootctl", f"--esp-path={ESP_MOUNT}",
+             "install"],
         ]
     if bootloader == "grub":
         return [
             ["arch-chroot", root, "grub-install", "--target=x86_64-efi",
-             "--efi-directory=/boot/efi", "--bootloader-id=ModularLinux",
+             f"--efi-directory={ESP_MOUNT}", "--bootloader-id=ModularLinux",
              "--recheck"],
             ["arch-chroot", root, "grub-mkconfig", "-o",
-             "/boot/grub/grub.cfg"],
+             f"{ESP_MOUNT}/grub/grub.cfg"],
         ]
     raise ValueError(
         f"unsupported bootloader: {bootloader!r} "
         f"(supported: {', '.join(SUPPORTED_BOOTLOADERS)})"
     )
+
+
+def systemd_boot_files(kernel: str = "linux", root_arg: str = "",
+                       ucode: str | None = None,
+                       esp_root: str = "/mnt/boot") -> dict[str, str]:
+    """Return {path: content} for the systemd-boot loader configuration.
+
+    `bootctl install` only copies the systemd-boot binaries to the ESP;
+    without a loader.conf and at least one entry the installed system has
+    nothing to boot. This generates:
+
+      - loader/loader.conf                 (default entry + timeout)
+      - loader/entries/arch.conf           (standard image + microcode)
+      - loader/entries/arch-fallback.conf  (fallback initramfs image)
+
+    `root_arg` must be a full root= value such as ``PARTUUID=abcd-1234``
+    or ``/dev/sda2``. `ucode` is the microcode package name
+    (``amd-ucode``/``intel-ucode``) or None.
+    """
+    if not root_arg:
+        raise ValueError("root_arg is required (PARTUUID=... or /dev/...)")
+    lines = ["title   Modular Linux", f"linux   /vmlinuz-{kernel}"]
+    if ucode:
+        lines.append(f"initrd  /{ucode}.img")
+    lines.append(f"initrd  /initramfs-{kernel}.img")
+    lines.append(f"options root={root_arg} rw")
+    entry = "\n".join(lines) + "\n"
+    fallback = (entry
+                .replace(f"/initramfs-{kernel}.img",
+                         f"/initramfs-{kernel}-fallback.img")
+                .replace("title   Modular Linux",
+                         "title   Modular Linux (fallback)"))
+    loader_conf = "default   arch.conf\ntimeout  5\nconsole-mode keep\n"
+    return {
+        f"{esp_root}/loader/loader.conf": loader_conf,
+        f"{esp_root}/loader/entries/arch.conf": entry,
+        f"{esp_root}/loader/entries/arch-fallback.conf": fallback,
+    }
 
 
 def enable_service_command(service: str, root: str = "/mnt") -> list[str]:

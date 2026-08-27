@@ -120,6 +120,21 @@ def build_plan(resolution,
         else:
             if pkg not in official:
                 official.append(pkg)
+
+    # Tools required by the selected bootloader/filesystem that are not
+    # part of the base set. GRUB needs the grub package (plus efibootmgr
+    # to write the NVRAM entry); btrfs roots need btrfs-progs in the
+    # installed system for future maintenance (fsck.btrfs, subvolume
+    # tooling, mkinitcpio's btrfs hook).
+    system_tooling: list[str] = []
+    if bootloader == "grub":
+        system_tooling += ["grub", "efibootmgr"]
+    if filesystem == "btrfs":
+        system_tooling.append("btrfs-progs")
+    for pkg in system_tooling:
+        if pkg not in official:
+            official.append(pkg)
+
     return InstallationPlan(
         kernel=kernel,
         base_packages=base_packages(kernel),

@@ -3,6 +3,8 @@ amd-ucode
 arch-install-scripts
 archlinux-keyring
 base
+btrfs-progs
+dosfstools
 efibootmgr
 git
 gtk3

@@ -23,13 +23,10 @@ from engine.profiles import default_registry
 from engine.resolver import Resolver
 from installer.hardware.detect import detect
 from installer.logging.setup import get_logger, register_secret
-from installer.installation.steps import (
-    bootloader_commands, configure_locale, enable_service_command,
-    execute_step, genfstab_command, is_chroot_ready, pacstrap_command,
-    regenerate_initramfs, set_hostname, set_keymap, set_timezone,
-    user_commands, export_configuration,
+from installer.installation.orchestrator import (
+    InstallOptions, run_installation,
 )
-from installer.storage.partition import Partitioner, is_safe_install_target
+from installer.storage.partition import is_safe_install_target
 
 PAGES = ["Welcome", "Hardware", "System Type", "Desktop", "Features",
          "Applications", "Advanced", "Services", "User", "Disk", "Summary"]
@@ -709,117 +706,48 @@ class InstallerWindow(Gtk.Window):
         threading.Thread(target=self._install_worker,
                          args=(password, root_pw), daemon=True).start()
 
-    def _run_steps(self, log, steps, label, allow_continue=True):
-        for cmd in steps:
-            rc, out = execute_step(cmd, timeout=300)
-            if rc != 0:
-                msg = f"{label} failed: {out}"
-                if allow_continue:
-                    log.warning(msg)
-                else:
-                    raise RuntimeError(msg)
-            else:
-                log.info("%s ok: %s", label, " ".join(cmd[:3]))
-
     def _install_worker(self, password: str, root_password: str):
+        """Drive the installation via the shared orchestrator.
+
+        This is the *only* install sequence in the codebase: the GUI and
+        the `modular install` CLI both call run_installation(), so the two
+        paths cannot drift apart.
+        """
         log = self.log
-        mounted = False
         try:
-            plan = self._last_plan
             cfg = self._last_cfg
             device = self.selected_device()
-            part = Partitioner(device, cfg.filesystem_type, dry_run=False)
-            if part.execute(confirm=True) != 0:
-                raise RuntimeError("partitioning failed")
-            mounted = True
-            rc, out = execute_step(
-                pacstrap_command(plan.all_packages()), timeout=1800)
-            if rc != 0:
-                raise RuntimeError(f"pacstrap failed: {out}")
-            if not is_chroot_ready("/mnt"):
-                raise RuntimeError("pacstrap did not populate /mnt")
-            execute_step(["mkdir", "-p", "/mnt/etc"], timeout=30)
-            rc, _ = execute_step(
-                ["arch-chroot", "/mnt", "/bin/bash", "-c",
-                 genfstab_command()], timeout=60)
-            if rc != 0:
-                raise RuntimeError("genfstab failed")
-            hostname = self._hostname_or_default()
-            for cmd in set_hostname(hostname):
-                rc, out = execute_step(cmd, timeout=30)
-                if rc != 0:
-                    raise RuntimeError(f"hostname setup failed: {out}")
-            for cmd in set_timezone(self._timezone_or_default()):
-                rc, out = execute_step(cmd, timeout=30)
-                if rc != 0:
-                    raise RuntimeError(f"timezone setup failed: {out}")
-            for cmd in set_keymap(self._keymap_or_default()):
-                rc, out = execute_step(cmd, timeout=30)
-                if rc != 0:
-                    raise RuntimeError(f"keymap setup failed: {out}")
-            for cmd in configure_locale(self._locale_or_default()):
-                rc, out = execute_step(cmd, timeout=120)
-                if rc != 0:
-                    raise RuntimeError(f"locale setup failed: {out}")
+            extra_services = sorted(
+                svc for svc, check in self.service_checks.items()
+                if check.get_active())
+            opts = InstallOptions(
+                hostname=self._hostname_or_default(),
+                locale=self._locale_or_default(),
+                timezone=self._timezone_or_default(),
+                keymap=self._keymap_or_default(),
+                administrator=self.admin_check.get_active(),
+                confirm=True,
+                extra_services=extra_services,
+            )
             username = self.username_entry.get_text().strip() or "user"
-            fullname = self.fullname_entry.get_text().strip() or username
-            cmds = user_commands(username, fullname, password,
-                                 root_password=root_password or None,
-                                 administrator=self.admin_check.get_active())
-            marker = getattr(cmds, "marker", {})
-            user_marker = marker.get("__stdin_user__")
-            root_marker = marker.get("__stdin_root__", "")
-            chpasswd_index = 0
-            for cmd in cmds:
-                if cmd[-2:] == ["chpasswd"]:
-                    if chpasswd_index == 0 and user_marker:
-                        u, p = user_marker
-                        stdin_text = f"{u}:{p}\n"
-                    elif chpasswd_index == 1 and root_marker:
-                        stdin_text = f"root:{root_marker}\n"
-                    else:
-                        stdin_text = None
-                    chpasswd_index += 1
-                else:
-                    stdin_text = None
-                rc, out = execute_step(cmd, stdin_text, timeout=120)
-                if rc != 0:
-                    raise RuntimeError(f"user setup failed: {out}")
-            for cmd in regenerate_initramfs(cfg.kernel):
-                rc, out = execute_step(cmd, timeout=300)
-                if rc != 0:
-                    raise RuntimeError(f"initramfs regen failed: {out}")
-            services = set(plan.services)
-            services |= {s for s, c in self.service_checks.items()
-                         if c.get_active()}
-            if plan.login_manager and plan.login_manager not in \
-                    ("none", "ly", "cosmic-greeter"):
-                services.add(plan.login_manager)
-            for svc in sorted(services):
-                rc, out = execute_step(enable_service_command(svc),
-                                       timeout=60)
-                if rc != 0:
-                    log.warning("could not enable %s: %s", svc, out)
-            for cmd in bootloader_commands(cfg.bootloader_type):
-                rc, out = execute_step(cmd, timeout=300)
-                if rc != 0:
-                    raise RuntimeError("bootloader failed: " + out)
-            files = export_configuration(_dump_yaml(cfg))
-            execute_step(["mkdir", "-p", "/mnt/etc/modular"], timeout=30)
-            for path, content in files.items():
-                execute_step(["tee", path], stdin_text=content, timeout=30)
-            log.info("installation completed successfully on %s", device)
-            GLib.idle_add(self._show_done, True, "")
+            full_name = self.fullname_entry.get_text().strip() or username
+            rc = run_installation(cfg, device=device,
+                                  username=username,
+                                  full_name=full_name,
+                                  user_password=password,
+                                  root_password=root_password or None,
+                                  opts=opts)
+            if rc == 0:
+                log.info("installation completed successfully on %s", device)
+                GLib.idle_add(self._show_done, True, "")
+            else:
+                log.error("installation failed on %s (rc=%s)", device, rc)
+                GLib.idle_add(
+                    self._show_done, False,
+                    "Installation failed — see the installer log "
+                    "(/var/log/modular/installer.log) and console output.")
         except Exception as exc:
             log.error("installation failed: %s", exc)
-            # Best-effort cleanup: umount what we may have mounted so the
-            # next attempt starts from a clean state.
-            if mounted:
-                for target in ("/mnt/boot/efi", "/mnt"):
-                    try:
-                        execute_step(["umount", "-R", target], timeout=15)
-                    except Exception:
-                        pass
             GLib.idle_add(self._show_done, False, str(exc))
         finally:
             self._building = False
@@ -842,15 +770,3 @@ class InstallerWindow(Gtk.Window):
                                 buttons=Gtk.ButtonsType.CLOSE, text=message)
         dlg.run()
         dlg.destroy()
-
-
-def _dump_yaml(cfg: ModularConfiguration) -> str:
-    import io
-
-    buf = io.StringIO()
-    try:
-        import yaml
-        yaml.safe_dump(cfg.to_dict(), buf, sort_keys=False)
-        return buf.getvalue()
-    except ImportError:
-        return repr(cfg.to_dict())
