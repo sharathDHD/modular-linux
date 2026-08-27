@@ -1,6 +1,0 @@
-id: app.blender
-name: Blender
-category: graphics
-requires: [hardware.audio]
-packages:
-  - blender

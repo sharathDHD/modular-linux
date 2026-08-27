@@ -1,7 +1,0 @@
-id: app.vlc
-name: VLC
-category: media
-requires:
-  - hardware.audio
-packages:
-  - vlc

@@ -1,9 +1,0 @@
-id: role.server
-name: Server
-category: role
-description: SSH, Git, containers, monitoring - no desktop required
-requires: [app.openssh-server, app.git, app.podman, app.btop,
-           app.fastfetch, app.rsync-tool, app.tmux-tool]
-conflicts: [desktop.kde, desktop.gnome, desktop.xfce, desktop.cinnamon,
-            desktop.mate, desktop.lxqt, desktop.lxde, desktop.budgie,
-            desktop.cosmic, wm.sway, wm.i3]

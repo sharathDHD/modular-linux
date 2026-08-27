@@ -1,5 +1,0 @@
-id: app.ncdu-tool
-name: ncdu
-category: utilities
-packages:
-  - ncdu

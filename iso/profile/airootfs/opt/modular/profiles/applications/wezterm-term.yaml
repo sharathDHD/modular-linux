@@ -1,5 +1,0 @@
-id: app.wezterm-term
-name: WezTerm
-category: terminal
-packages:
-  - wezterm

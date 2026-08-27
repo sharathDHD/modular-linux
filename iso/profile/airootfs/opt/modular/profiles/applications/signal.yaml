@@ -1,6 +1,0 @@
-id: app.signal
-name: Signal
-category: communication
-requires: [hardware.audio]
-packages:
-  - signal-desktop

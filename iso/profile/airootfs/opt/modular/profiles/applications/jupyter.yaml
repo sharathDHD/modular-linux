@@ -1,6 +1,0 @@
-id: app.jupyter
-name: Jupyter
-category: ai-ml
-requires: [app.python]
-packages:
-  - jupyter-notebook

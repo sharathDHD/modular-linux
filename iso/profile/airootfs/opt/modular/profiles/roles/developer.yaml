@@ -1,7 +1,0 @@
-id: role.developer
-name: Developer Workstation
-category: role
-description: Git, Python, Node.js, Rust, Go, C/C++, containers, editors
-requires: [app.git, app.python, app.nodejs, app.rust, app.go-lang,
-           app.gcc-cpp, app.clang-llvm, app.meson-build, app.docker,
-           app.vscodium, app.neovim, app.github-cli]

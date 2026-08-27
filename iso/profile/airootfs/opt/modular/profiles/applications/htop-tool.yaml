@@ -1,5 +1,0 @@
-id: app.htop-tool
-name: htop
-category: utilities
-packages:
-  - htop

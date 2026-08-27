@@ -1,5 +1,0 @@
-id: app.neovim
-name: Neovim
-category: development
-packages:
-  - neovim

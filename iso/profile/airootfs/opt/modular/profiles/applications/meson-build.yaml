@@ -1,6 +1,0 @@
-id: app.meson-build
-name: Meson
-category: development
-packages:
-  - meson
-  - ninja

@@ -1,5 +1,0 @@
-id: app.gimp
-name: GIMP
-category: graphics
-packages:
-  - gimp

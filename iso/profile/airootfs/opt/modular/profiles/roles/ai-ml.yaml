@@ -1,6 +1,0 @@
-id: role.ai-ml
-name: AI / Machine Learning Workstation
-category: role
-description: Python, uv, Jupyter, PyTorch/ONNX, OpenCV, containers
-requires: [app.python, app.uv-python, app.git, app.jupyter,
-           app.pytorch-cpu, app.docker]

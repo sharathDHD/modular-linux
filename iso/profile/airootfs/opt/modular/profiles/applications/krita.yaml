@@ -1,5 +1,0 @@
-id: app.krita
-name: Krita
-category: graphics
-packages:
-  - krita

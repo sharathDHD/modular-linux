@@ -1,5 +1,0 @@
-id: app.yq-tool
-name: yq
-category: utilities
-packages:
-  - go-yq

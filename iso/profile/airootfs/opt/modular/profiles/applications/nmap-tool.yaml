@@ -1,6 +1,0 @@
-id: app.nmap-tool
-name: Nmap
-category: security
-requires: [hardware.network]
-packages:
-  - nmap

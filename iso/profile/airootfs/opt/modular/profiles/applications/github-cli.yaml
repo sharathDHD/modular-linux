@@ -1,6 +1,0 @@
-id: app.github-cli
-name: GitHub CLI
-category: development
-requires: [app.git]
-packages:
-  - github-cli

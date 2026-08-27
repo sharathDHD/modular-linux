@@ -1,5 +1,0 @@
-id: app.starship-prompt
-name: Starship
-category: shell
-packages:
-  - starship

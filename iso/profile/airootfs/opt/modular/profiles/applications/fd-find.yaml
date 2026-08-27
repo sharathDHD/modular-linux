@@ -1,5 +1,0 @@
-id: app.fd-find
-name: fd
-category: utilities
-packages:
-  - fd

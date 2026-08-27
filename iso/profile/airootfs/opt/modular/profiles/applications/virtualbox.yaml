@@ -1,7 +1,0 @@
-id: app.virtualbox
-name: VirtualBox
-category: virtualization
-
-packages:
-  - virtualbox
-  - virtualbox-host-dkms

@@ -1,8 +1,0 @@
-id: desktop.cosmic
-name: COSMIC
-category: desktop
-description: System76 COSMIC desktop environment
-requires: [hardware.network]
-packages: [cosmic-session, cosmic-edit, cosmic-files, cosmic-terminal, cosmic-store, pop-theme]
-services: {enable: [NetworkManager]}
-display: {protocol: wayland}

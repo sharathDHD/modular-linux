@@ -1,7 +1,0 @@
-id: wm.openbox
-name: Openbox
-category: window-manager
-requires: [hardware.network]
-packages: [openbox, obconf, tint2, dmenu, alacritty, picom]
-services: {enable: [NetworkManager]}
-display: {protocol: x11}

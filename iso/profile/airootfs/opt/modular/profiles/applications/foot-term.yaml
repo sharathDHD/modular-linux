@@ -1,5 +1,0 @@
-id: app.foot-term
-name: foot
-category: terminal
-packages:
-  - foot

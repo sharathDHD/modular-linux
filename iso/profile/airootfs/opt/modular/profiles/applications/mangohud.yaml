@@ -1,6 +1,0 @@
-id: app.mangohud
-name: MangoHud
-category: gaming
-requires: [hardware.audio]
-packages:
-  - mangohud

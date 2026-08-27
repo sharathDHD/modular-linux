@@ -1,6 +1,0 @@
-id: app.gcc-cpp
-name: GCC C/C++
-category: development
-packages:
-  - gcc
-  - make

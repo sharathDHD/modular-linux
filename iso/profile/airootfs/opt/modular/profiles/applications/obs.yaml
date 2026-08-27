@@ -1,7 +1,0 @@
-id: app.obs-studio
-name: OBS Studio
-category: media
-requires:
-  - hardware.audio
-packages:
-  - obs-studio

@@ -1,5 +1,0 @@
-id: app.rust
-name: Rust
-category: development
-packages:
-  - rustup

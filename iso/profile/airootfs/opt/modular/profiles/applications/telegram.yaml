@@ -1,5 +1,0 @@
-id: app.telegram
-name: Telegram
-category: communication
-packages:
-  - telegram-desktop

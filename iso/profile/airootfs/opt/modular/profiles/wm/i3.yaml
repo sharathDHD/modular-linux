@@ -1,7 +1,0 @@
-id: wm.i3
-name: i3
-category: window-manager
-requires: [hardware.network]
-packages: [i3-wm, i3status, i3lock, dmenu, alacritty, picom, nitrogen]
-services: {enable: [NetworkManager]}
-display: {protocol: x11}

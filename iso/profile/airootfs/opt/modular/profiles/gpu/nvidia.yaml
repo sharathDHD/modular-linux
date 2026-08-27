@@ -1,6 +1,0 @@
-id: gpu.nvidia
-name: NVIDIA Proprietary
-category: gpu
-description: NVIDIA proprietary driver for the stock linux kernel
-packages: [nvidia, nvidia-utils, nvidia-prime]
-conflicts: [gpu.nouveau]

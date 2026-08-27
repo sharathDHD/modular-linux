@@ -1,6 +1,0 @@
-id: app.python
-name: Python
-category: development
-packages:
-  - python
-  - python-pip

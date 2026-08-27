@@ -1,4 +1,0 @@
-id: hardware.vpn
-name: VPN Support
-category: hardware
-packages: [networkmanager-openvpn, networkmanager-openconnect, wireguard-tools]

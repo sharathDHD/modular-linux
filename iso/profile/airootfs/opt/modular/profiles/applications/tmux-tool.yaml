@@ -1,5 +1,0 @@
-id: app.tmux-tool
-name: tmux
-category: utilities
-packages:
-  - tmux

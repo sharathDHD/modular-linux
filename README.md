@@ -9,12 +9,15 @@ environments, services, and system roles.
 > Build the Linux system the user actually wants instead of installing a
 > generic system and removing everything they do not want.
 
-**Current status (v0.2.0):** Arch Linux on x86_64 with systemd. The
+**Current status (v0.2.1):** Arch Linux on x86_64 with systemd. The
 graphical installer and the `modular install <modular.yaml>` CLI both
 drive the same Python orchestrator (`installer/installation/orchestrator.py`)
-so configuration-based reproduction is fully supported. Other base
-distributions, ARM64 ISO builds, and alternate init systems are tracked
-in the roadmap but not yet implemented in the install executor.
+so configuration-based reproduction is fully supported. v0.2.1 fixes the
+install execution path (partitioning script delivery, password stdin,
+fstab generation, systemd-boot loader entries, mkinitcpio preset flag)
+and adds execution-layer regression tests. Other base distributions,
+ARM64 ISO builds, and alternate init systems are tracked in the roadmap
+but not yet implemented in the install executor.
 
 ## Repository Layout
 

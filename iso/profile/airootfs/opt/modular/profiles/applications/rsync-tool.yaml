@@ -1,5 +1,0 @@
-id: app.rsync-tool
-name: rsync
-category: utilities
-packages:
-  - rsync

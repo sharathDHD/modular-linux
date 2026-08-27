@@ -1,5 +1,0 @@
-id: app.chromium
-name: Chromium
-category: internet
-packages:
-  - chromium

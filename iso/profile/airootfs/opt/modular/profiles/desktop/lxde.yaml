@@ -1,7 +1,0 @@
-id: desktop.lxde
-name: LXDE
-category: desktop
-requires: [hardware.network]
-packages: [lxde, lxdm, xorg-server]
-services: {enable: [lxdm, NetworkManager]}
-display: {protocol: x11}

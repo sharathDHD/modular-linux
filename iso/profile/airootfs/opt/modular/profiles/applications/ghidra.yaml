@@ -1,7 +1,0 @@
-id: app.ghidra
-name: Ghidra
-category: security
-source: aur
-requires: [app.jdk-openjdk]
-packages:
-  - ghidra

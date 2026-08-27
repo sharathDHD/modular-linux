@@ -1,5 +1,0 @@
-id: app.kitty-term
-name: kitty
-category: terminal
-packages:
-  - kitty

@@ -1,6 +1,0 @@
-id: role.general
-name: General Desktop
-category: role
-description: Browser, audio, video, office, file management, archive tools
-requires: [hardware.audio, app.firefox, app.vlc, app.libreoffice,
-           app.okular, app.7zip, app.curl]

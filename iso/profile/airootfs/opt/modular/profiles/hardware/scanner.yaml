@@ -1,6 +1,0 @@
-id: hardware.scanner
-name: Scanner
-category: hardware
-requires: [hardware.printing]
-packages: [sane, simple-scan]
-services: {enable: [saned.socket]}

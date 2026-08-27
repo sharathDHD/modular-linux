@@ -1,5 +1,0 @@
-id: app.fzf-tool
-name: fzf
-category: utilities
-packages:
-  - fzf

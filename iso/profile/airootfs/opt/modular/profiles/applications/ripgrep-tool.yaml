@@ -1,5 +1,0 @@
-id: app.ripgrep-tool
-name: ripgrep
-category: utilities
-packages:
-  - ripgrep

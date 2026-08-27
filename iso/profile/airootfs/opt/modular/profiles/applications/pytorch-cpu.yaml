@@ -1,8 +1,0 @@
-id: app.pytorch-cpu
-name: PyTorch (CPU)
-category: ai-ml
-requires: [app.python]
-packages:
-  - python-pytorch
-  - python-onnxruntime
-  - opencv

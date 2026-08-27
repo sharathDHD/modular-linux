@@ -1,5 +1,0 @@
-id: app.openssh-server
-name: OpenSSH Server
-category: security
-packages:
-  - openssh

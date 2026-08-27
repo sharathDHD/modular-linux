@@ -8,3 +8,8 @@ __pycache__/
 cmd/modular/modular
 modular-installer.log
 .pytest_cache/
+
+# Staged into the ISO profile by build.sh at build time — never commit
+iso/profile/airootfs/opt/modular/
+iso/profile/airootfs/usr/local/bin/modular
+iso/profile/airootfs/usr/local/bin/modular-detect

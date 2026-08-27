@@ -1,5 +1,0 @@
-id: app.jq-tool
-name: jq
-category: utilities
-packages:
-  - jq

@@ -1,5 +1,0 @@
-id: app.libreoffice
-name: LibreOffice
-category: office
-packages:
-  - libreoffice-fresh

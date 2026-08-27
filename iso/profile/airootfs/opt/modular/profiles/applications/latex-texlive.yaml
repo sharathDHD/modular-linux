@@ -1,7 +1,0 @@
-id: app.latex-texlive
-name: LaTeX
-category: office
-packages:
-  - texlive-basic
-  - texlive-latexrecommended
-  - biber

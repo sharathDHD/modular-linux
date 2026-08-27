@@ -1,7 +1,0 @@
-id: desktop.mate
-name: MATE
-category: desktop
-requires: [hardware.network]
-packages: [mate, mate-extra, lightdm, lightdm-gtk-greeter, xorg-server]
-services: {enable: [lightdm, NetworkManager]}
-display: {protocol: x11}

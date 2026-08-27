@@ -1,7 +1,0 @@
-id: desktop.lxqt
-name: LXQt
-category: desktop
-requires: [hardware.network]
-packages: [lxqt, sddm, oxygen-icons]
-services: {enable: [sddm, NetworkManager]}
-display: {protocol: x11}

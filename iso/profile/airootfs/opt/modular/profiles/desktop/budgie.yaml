@@ -1,7 +1,0 @@
-id: desktop.budgie
-name: Budgie
-category: desktop
-requires: [hardware.network]
-packages: [budgie-desktop, budgie-desktop-view, gnome-control-center, lightdm, lightdm-gtk-greeter, gnome-screensaver]
-services: {enable: [lightdm, NetworkManager]}
-display: {protocol: wayland}

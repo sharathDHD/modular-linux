@@ -1,6 +1,0 @@
-id: app.pnpm
-name: pnpm
-category: development
-requires: [app.nodejs]
-packages:
-  - pnpm
