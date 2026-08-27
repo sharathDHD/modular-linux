@@ -1,0 +1,5 @@
+id: app.vscodium
+name: VSCodium
+category: development
+packages:
+  - vscodium

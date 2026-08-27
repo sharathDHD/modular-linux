@@ -1,0 +1,12 @@
+id: base.arch
+name: Arch Base
+category: base
+
+packages:
+  - base
+  - linux
+  - linux-firmware
+  - sudo
+
+services:
+  enable: []

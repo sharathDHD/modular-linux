@@ -1,0 +1,7 @@
+id: app.zsh-shell
+name: Zsh
+category: shell
+packages:
+  - zsh
+  - zsh-autosuggestions
+  - zsh-syntax-highlighting

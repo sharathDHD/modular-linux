@@ -1,0 +1,6 @@
+id: role.student
+name: Student
+category: role
+description: Firefox, LibreOffice, PDF viewer, LaTeX, Python, Git
+requires: [app.firefox, app.libreoffice, app.okular, app.latex-texlive,
+           app.python, app.git]

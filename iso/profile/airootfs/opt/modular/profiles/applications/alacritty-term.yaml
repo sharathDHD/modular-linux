@@ -1,0 +1,5 @@
+id: app.alacritty-term
+name: Alacritty
+category: terminal
+packages:
+  - alacritty

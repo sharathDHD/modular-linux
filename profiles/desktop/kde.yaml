@@ -1,0 +1,19 @@
+id: desktop.kde
+name: KDE Plasma
+category: desktop
+
+requires:
+  - hardware.network
+
+packages:
+  - plasma
+  - sddm
+  - konsole
+
+services:
+  enable:
+    - sddm
+    - NetworkManager
+
+display:
+  protocol: wayland

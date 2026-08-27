@@ -1,0 +1,16 @@
+version: 1
+base: {distribution: arch}
+system: {architecture: x86_64, kernel: linux-zen, init: systemd}
+desktop: {environment: kde}
+hardware: {network: true, wifi: true, bluetooth: true, audio: true,
+           gpu: nvidia-proprietary}
+roles: [gaming]
+applications: [steam, firefox]
+shell: {type: fish}
+filesystem: {type: btrfs}
+bootloader: {type: systemd-boot}
+sources:
+  arch: true
+  aur: true
+  flatpak: false
+  appimage: false

@@ -1,0 +1,7 @@
+id: wm.labwc
+name: labwc
+category: window-manager
+requires: [hardware.network]
+packages: [labwc, foot, fuzzel, swaybg]
+services: {enable: [NetworkManager]}
+display: {protocol: wayland}

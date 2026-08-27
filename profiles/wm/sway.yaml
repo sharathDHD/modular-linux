@@ -1,0 +1,7 @@
+id: wm.sway
+name: Sway
+category: window-manager
+requires: [hardware.network]
+packages: [sway, swaybg, swaylock, foot, wofi, mako, xdg-desktop-portal-wlr, grim, slurp]
+services: {enable: [NetworkManager]}
+display: {protocol: wayland}

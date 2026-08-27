@@ -1,0 +1,46 @@
+# modular.schema.yaml — informational schema for modular.yaml v1 (spec §30-§31)
+version: { type: int, enum: [1] }
+base:
+  distribution: { type: str, enum: [arch] }
+system:
+  architecture: { type: str, enum: [x86_64], default: x86_64 }
+  kernel: { type: str, enum: [linux, linux-lts, linux-zen, linux-hardened], default: linux }
+  init: { type: str, enum: [systemd], default: systemd }
+desktop:
+  environment:
+    type: str
+    enum: [kde, gnome, xfce, cinnamon, mate, lxqt, lxde, budgie, cosmic,
+           hyprland, sway, i3, openbox, awesome, bspwm, river, labwc, none]
+    default: none
+  display: { type: str, enum: [wayland, x11, automatic], default: automatic }
+  login_manager: { type: str, enum: [sddm, gdm, lightdm, ly, none, automatic],
+                   default: automatic }
+hardware:
+  network: { type: bool, default: false }
+  wifi: { type: bool, default: false, requires: [network] }
+  bluetooth: { type: bool, default: false }
+  audio: { type: bool, default: false }
+  webcam: { type: bool, default: false }
+  printing: { type: bool, default: false }
+  scanner: { type: bool, default: false, requires: [printing] }
+  vpn: { type: bool, default: false }
+  gpu: { type: str, enum: [automatic, open-source, nvidia-proprietary, manual],
+         default: automatic }
+roles:
+  type: list[str]
+  enum: [general, developer, ai-ml, gaming, creator, student, server,
+         security]
+applications:
+  type: list[str]
+  items: app.* profile ids (profiles/applications/)
+shell:
+  type: { type: str, enum: [bash, zsh, fish], default: bash }
+filesystem:
+  type: { type: str, enum: [ext4, btrfs], default: ext4 }
+bootloader:
+  type: { type: str, enum: [systemd-boot, grub], default: systemd-boot }
+sources:
+  arch: { type: bool, default: true, trusted: true }
+  aur: { type: bool, default: false, trusted: false }
+  flatpak: { type: bool, default: false, trusted: false }
+  appimage: { type: bool, default: false, trusted: false }

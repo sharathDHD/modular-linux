@@ -1,0 +1,7 @@
+id: app.qemu-kvm
+name: QEMU/KVM
+category: virtualization
+packages:
+  - qemu-desktop
+  - libvirt
+  - virt-manager

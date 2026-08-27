@@ -1,0 +1,6 @@
+id: app.uv-python
+name: uv (Python manager)
+category: ai-ml
+requires: [app.python]
+packages:
+  - uv

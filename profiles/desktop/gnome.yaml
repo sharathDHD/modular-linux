@@ -1,0 +1,18 @@
+id: desktop.gnome
+name: GNOME
+category: desktop
+
+requires:
+  - hardware.network
+
+packages:
+  - gnome
+  - gdm
+
+services:
+  enable:
+    - gdm
+    - NetworkManager
+
+display:
+  protocol: wayland

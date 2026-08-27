@@ -1,0 +1,11 @@
+id: hardware.bluetooth
+name: Bluetooth
+category: hardware
+
+packages:
+  - bluez
+  - bluez-utils
+
+services:
+  enable:
+    - bluetooth

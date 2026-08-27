@@ -1,0 +1,5 @@
+id: app.jdk-openjdk
+name: Java (OpenJDK)
+category: development
+packages:
+  - jdk17-openjdk

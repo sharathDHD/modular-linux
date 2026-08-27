@@ -1,0 +1,5 @@
+id: app.firefox
+name: Firefox
+category: internet
+packages:
+  - firefox

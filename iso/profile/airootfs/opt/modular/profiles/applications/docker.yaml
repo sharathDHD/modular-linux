@@ -1,0 +1,6 @@
+id: app.docker
+name: Docker
+category: virtualization
+packages:
+  - docker
+  - docker-compose

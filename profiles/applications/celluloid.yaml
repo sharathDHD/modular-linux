@@ -1,0 +1,6 @@
+id: app.celluloid
+name: Celluloid
+category: media
+requires: [hardware.audio]
+packages:
+  - celluloid

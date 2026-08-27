@@ -1,0 +1,10 @@
+id: hardware.network
+name: Networking
+category: hardware
+
+packages:
+  - networkmanager
+
+services:
+  enable:
+    - NetworkManager

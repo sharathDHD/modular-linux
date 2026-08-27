@@ -1,0 +1,6 @@
+id: role.security
+name: Security Research
+category: role
+description: Wireshark, Nmap, tcpdump, Ghidra, network and dev utilities
+requires: [app.wireshark, app.nmap-tool, app.tcpdump-tool, app.ghidra,
+           app.openssh-server, app.git, app.python]

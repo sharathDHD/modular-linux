@@ -1,0 +1,5 @@
+id: gpu.amd
+name: AMD Graphics
+category: gpu
+description: Mesa/RadeonSI + Vulkan + firmware for AMD GPUs (spec §33)
+packages: [mesa, vulkan-radeon, libva-mesa-driver, mesa-vdpau, amd-ucode]

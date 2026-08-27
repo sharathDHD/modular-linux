@@ -1,0 +1,12 @@
+version: 1
+base: {distribution: arch}
+system: {architecture: x86_64, kernel: linux, init: systemd}
+desktop: {environment: kde}
+hardware: {network: true, wifi: true, bluetooth: true, audio: true,
+           webcam: true, gpu: automatic}
+roles: [developer]
+applications: [firefox, git, docker]
+shell: {type: zsh}
+filesystem: {type: ext4}
+bootloader: {type: systemd-boot}
+sources: {arch: true, aur: false, flatpak: false, appimage: false}

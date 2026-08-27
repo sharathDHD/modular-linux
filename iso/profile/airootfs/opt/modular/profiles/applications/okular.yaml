@@ -1,0 +1,5 @@
+id: app.okular
+name: Okular
+category: office
+packages:
+  - okular

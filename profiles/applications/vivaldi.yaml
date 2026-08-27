@@ -1,0 +1,6 @@
+id: app.vivaldi
+name: Vivaldi
+category: internet
+source: aur
+packages:
+  - vivaldi

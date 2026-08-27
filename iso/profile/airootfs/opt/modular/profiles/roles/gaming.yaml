@@ -1,0 +1,6 @@
+id: role.gaming
+name: Gaming System
+category: role
+description: Steam, Wine/Proton, Lutris, Heroic, Gamescope, MangoHud
+requires: [hardware.audio, app.steam, app.lutris, app.heroic, app.wine,
+           app.gamescope, app.mangohud, app.discord]

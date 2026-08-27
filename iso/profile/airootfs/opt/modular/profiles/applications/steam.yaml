@@ -1,0 +1,8 @@
+id: app.steam
+name: Steam
+category: gaming
+requires:
+  - hardware.audio
+packages:
+  - steam
+  - lib32-mesa

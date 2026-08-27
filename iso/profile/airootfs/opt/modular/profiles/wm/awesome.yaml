@@ -1,0 +1,7 @@
+id: wm.awesome
+name: awesome
+category: window-manager
+requires: [hardware.network]
+packages: [awesome, vicious, alacritty, rofi]
+services: {enable: [NetworkManager]}
+display: {protocol: x11}

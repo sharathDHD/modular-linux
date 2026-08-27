@@ -1,0 +1,5 @@
+id: app.git
+name: Git
+category: development
+packages:
+  - git

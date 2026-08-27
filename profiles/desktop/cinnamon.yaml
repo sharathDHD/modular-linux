@@ -1,0 +1,7 @@
+id: desktop.cinnamon
+name: Cinnamon
+category: desktop
+requires: [hardware.network]
+packages: [cinnamon, lightdm, lightdm-gtk-greeter, xorg-server]
+services: {enable: [lightdm, NetworkManager]}
+display: {protocol: x11}

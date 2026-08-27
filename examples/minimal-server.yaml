@@ -1,0 +1,11 @@
+version: 1
+base: {distribution: arch}
+system: {architecture: x86_64, kernel: linux-lts, init: systemd}
+desktop: {environment: none}
+hardware: {network: true, gpu: manual}
+roles: [server]
+applications: []
+shell: {type: bash}
+filesystem: {type: ext4}
+bootloader: {type: systemd-boot}
+sources: {arch: true, aur: false, flatpak: false, appimage: false}

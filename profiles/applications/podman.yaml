@@ -1,0 +1,6 @@
+id: app.podman
+name: Podman
+category: virtualization
+packages:
+  - podman
+  - podman-compose

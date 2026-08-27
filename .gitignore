@@ -1,0 +1,7 @@
+out/
+bin/
+.venv/
+__pycache__/
+*.pyc
+.iso
+cmd/modular/modular

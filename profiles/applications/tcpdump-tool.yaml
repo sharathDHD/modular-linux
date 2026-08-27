@@ -1,0 +1,6 @@
+id: app.tcpdump-tool
+name: tcpdump
+category: security
+requires: [hardware.network]
+packages:
+  - tcpdump

@@ -1,0 +1,6 @@
+id: app.brave
+name: Brave
+category: internet
+source: aur
+packages:
+  - brave-bin

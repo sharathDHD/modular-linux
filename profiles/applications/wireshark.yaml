@@ -1,0 +1,6 @@
+id: app.wireshark
+name: Wireshark
+category: security
+requires: [hardware.network]
+packages:
+  - wireshark-qt

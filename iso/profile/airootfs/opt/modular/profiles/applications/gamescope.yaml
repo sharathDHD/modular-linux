@@ -1,0 +1,7 @@
+id: app.gamescope
+name: Gamescope
+category: gaming
+requires: [hardware.audio]
+packages:
+  - gamescope
+  - mangohud

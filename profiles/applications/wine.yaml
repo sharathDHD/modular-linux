@@ -1,0 +1,7 @@
+id: app.wine
+name: Wine
+category: gaming
+requires: [hardware.audio]
+packages:
+  - wine
+  - winetricks

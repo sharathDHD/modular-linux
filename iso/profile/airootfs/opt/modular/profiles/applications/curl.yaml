@@ -1,0 +1,5 @@
+id: app.curl
+name: curl
+category: utilities
+packages:
+  - curl

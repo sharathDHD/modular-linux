@@ -1,0 +1,5 @@
+id: app.7zip
+name: 7zip
+category: utilities
+packages:
+  - 7zip

@@ -1,0 +1,7 @@
+id: role.creator
+name: Content Creation
+category: role
+description: OBS, Kdenlive, GIMP, Krita, Inkscape, Blender, Audacity
+requires: [hardware.audio, hardware.webcam, app.obs-studio, app.kdenlive,
+           app.gimp, app.krita, app.inkscape, app.blender, app.audacity,
+           app.handbrake]

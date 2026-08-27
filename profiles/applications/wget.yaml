@@ -1,0 +1,5 @@
+id: app.wget
+name: wget
+category: utilities
+packages:
+  - wget

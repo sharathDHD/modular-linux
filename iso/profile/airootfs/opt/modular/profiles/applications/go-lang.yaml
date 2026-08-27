@@ -1,0 +1,5 @@
+id: app.go-lang
+name: Go
+category: development
+packages:
+  - go

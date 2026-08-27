@@ -1,0 +1,7 @@
+id: wm.bspwm
+name: bspwm
+category: window-manager
+requires: [hardware.network]
+packages: [bspwm, sxhkd, polybar, alacritty, picom, rofi]
+services: {enable: [NetworkManager]}
+display: {protocol: x11}

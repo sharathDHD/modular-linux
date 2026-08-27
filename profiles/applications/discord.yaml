@@ -1,0 +1,6 @@
+id: app.discord
+name: Discord
+category: communication
+requires: [hardware.audio]
+packages:
+  - discord

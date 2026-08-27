@@ -1,0 +1,6 @@
+id: app.audacity
+name: Audacity
+category: media
+requires: [hardware.audio]
+packages:
+  - audacity

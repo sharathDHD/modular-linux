@@ -1,0 +1,6 @@
+id: gpu.nouveau
+name: NVIDIA Open Source
+category: gpu
+description: Open-source Nouveau/Mesa stack for NVIDIA GPUs
+packages: [mesa, vulkan-swrast]
+conflicts: [gpu.nvidia]

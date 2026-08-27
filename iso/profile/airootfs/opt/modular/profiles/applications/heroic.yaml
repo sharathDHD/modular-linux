@@ -1,0 +1,7 @@
+id: app.heroic
+name: Heroic Games Launcher
+category: gaming
+source: aur
+requires: [hardware.audio]
+packages:
+  - heroic-games-launcher

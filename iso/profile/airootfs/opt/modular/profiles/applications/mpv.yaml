@@ -1,0 +1,5 @@
+id: app.mpv
+name: MPV
+category: media
+packages:
+  - mpv

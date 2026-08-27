@@ -1,0 +1,10 @@
+id: hardware.wifi
+name: Wi-Fi
+category: hardware
+
+requires:
+  - hardware.network
+
+packages:
+  - networkmanager
+  - linux-firmware

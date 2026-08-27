@@ -1,0 +1,19 @@
+id: desktop.xfce
+name: XFCE
+category: desktop
+
+requires:
+  - hardware.network
+
+packages:
+  - xfce4
+  - lightdm
+  - lightdm-gtk-greeter
+
+services:
+  enable:
+    - lightdm
+    - NetworkManager
+
+display:
+  protocol: x11

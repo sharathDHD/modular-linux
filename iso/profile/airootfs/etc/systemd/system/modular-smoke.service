@@ -1,0 +1,10 @@
+[Unit]
+Description=Modular Linux live-media self-test
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'exec >/dev/console 2>&1; echo MODULAR-SMOKE-BEGIN; /usr/local/bin/modular version; /usr/local/bin/modular list roles | head -3; printf "detect: "; /usr/local/bin/modular-detect | grep -o "\\"cores\\": [0-9]*"; if /opt/modular/modular validate /opt/modular/modular.yaml >/dev/null 2>&1; then echo SMOKE-VALIDATE-OK; else echo SMOKE-VALIDATE-FAIL; fi; echo MODULAR-SMOKE-END'
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,9 @@
+id: hardware.webcam
+name: Webcam
+category: hardware
+
+requires:
+  - hardware.audio
+
+packages:
+  - v4l-utils

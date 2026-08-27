@@ -1,0 +1,5 @@
+id: app.fish-shell
+name: fish
+category: shell
+packages:
+  - fish

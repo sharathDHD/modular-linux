@@ -1,0 +1,6 @@
+id: app.onlyoffice
+name: OnlyOffice
+category: office
+source: aur
+packages:
+  - onlyoffice-bin

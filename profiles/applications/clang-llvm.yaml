@@ -1,0 +1,6 @@
+id: app.clang-llvm
+name: Clang
+category: development
+packages:
+  - clang
+  - llvm

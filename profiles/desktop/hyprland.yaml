@@ -1,0 +1,20 @@
+id: desktop.hyprland
+name: Hyprland
+category: desktop
+
+requires:
+  - hardware.network
+
+packages:
+  - hyprland
+  - waybar
+  - kitty
+  - wofi
+  - xdg-desktop-portal-hyprland
+
+services:
+  enable:
+    - NetworkManager
+
+display:
+  protocol: wayland

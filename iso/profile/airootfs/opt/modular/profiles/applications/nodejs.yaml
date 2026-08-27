@@ -1,0 +1,6 @@
+id: app.nodejs
+name: Node.js
+category: development
+packages:
+  - nodejs
+  - npm

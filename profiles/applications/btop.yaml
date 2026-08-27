@@ -1,0 +1,5 @@
+id: app.btop
+name: btop
+category: utilities
+packages:
+  - btop

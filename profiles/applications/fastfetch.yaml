@@ -1,0 +1,5 @@
+id: app.fastfetch
+name: fastfetch
+category: utilities
+packages:
+  - fastfetch

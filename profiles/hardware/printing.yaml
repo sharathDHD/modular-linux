@@ -1,0 +1,11 @@
+id: hardware.printing
+name: Printing
+category: hardware
+
+packages:
+  - cups
+  - cups-filters
+
+services:
+  enable:
+    - cups

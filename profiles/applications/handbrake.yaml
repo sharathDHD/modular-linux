@@ -1,0 +1,6 @@
+id: app.handbrake
+name: HandBrake
+category: media
+requires: [hardware.audio]
+packages:
+  - handbrake

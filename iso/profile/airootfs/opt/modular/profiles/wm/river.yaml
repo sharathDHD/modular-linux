@@ -1,0 +1,7 @@
+id: wm.river
+name: river
+category: window-manager
+requires: [hardware.network]
+packages: [river, foot, fuzzel, swaylock]
+services: {enable: [NetworkManager]}
+display: {protocol: wayland}

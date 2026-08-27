@@ -1,0 +1,15 @@
+id: hardware.audio
+name: Audio
+category: hardware
+
+packages:
+  - pipewire
+  - pipewire-audio
+  - pipewire-pulse
+  - wireplumber
+
+services:
+  enable:
+    - pipewire
+    - pipewire-pulse
+    - wireplumber

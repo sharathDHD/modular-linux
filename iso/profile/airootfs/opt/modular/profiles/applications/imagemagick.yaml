@@ -1,0 +1,5 @@
+id: app.imagemagick
+name: ImageMagick
+category: graphics
+packages:
+  - imagemagick

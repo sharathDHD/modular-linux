@@ -1,0 +1,5 @@
+id: gpu.intel
+name: Intel Graphics
+category: gpu
+description: Mesa + VAAPI media stack for Intel GPUs (spec §33)
+packages: [mesa, vulkan-intel, intel-media-driver, libva-intel-driver, intel-ucode]

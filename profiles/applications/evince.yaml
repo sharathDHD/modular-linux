@@ -1,0 +1,5 @@
+id: app.evince
+name: Evince
+category: office
+packages:
+  - evince
