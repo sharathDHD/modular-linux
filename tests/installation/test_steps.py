@@ -11,13 +11,15 @@ def test_pacstrap_includes_packages():
 
 def test_bootloader_systemd_boot():
     cmds = steps.bootloader_commands("systemd-boot")
-    assert ["arch-chroot", "/mnt", "bootctl", "install"] in cmds
+    assert ["arch-chroot", "/mnt", "bootctl", "--esp-path=/boot",
+            "install"] in cmds
 
 
 def test_bootloader_grub_supported():
     cmds = steps.bootloader_commands("grub")
     joined = [" ".join(c) for c in cmds]
     assert any("grub-install" in j for j in joined)
+    assert any("--efi-directory=/boot" in j for j in joined)
     assert any("grub-mkconfig" in j for j in joined)
 
 
@@ -105,9 +107,58 @@ def test_configure_locale():
     assert any("locale-gen" in c for c in cmds)
 
 
+def test_localization_inputs_validated():
+    with pytest.raises(ValueError):
+        steps.set_timezone("../../etc/passwd")
+    with pytest.raises(ValueError):
+        steps.set_timezone("")
+    with pytest.raises(ValueError):
+        steps.configure_locale("en_US.UTF-8; rm -rf /")
+    with pytest.raises(ValueError):
+        steps.set_keymap("us && reboot")
+    with pytest.raises(ValueError):
+        steps.set_hostname("bad host; name")
+
+
 def test_regenerate_initramfs():
+    # -P (all presets): -p was deprecated in mkinitcpio v38 and removed later
     cmds = steps.regenerate_initramfs("linux-zen")
-    assert ["arch-chroot", "/mnt", "mkinitcpio", "-p", "linux-zen"] in cmds
+    assert ["arch-chroot", "/mnt", "mkinitcpio", "-P"] in cmds
+    assert all("mkinitcpio" in " ".join(c) and "-p" not in c[3:]
+               for c in cmds)
+
+
+def test_systemd_boot_files_complete():
+    files = steps.systemd_boot_files(
+        kernel="linux", root_arg="PARTUUID=abcd-1234", ucode="intel-ucode")
+    assert set(files) == {
+        "/mnt/boot/loader/loader.conf",
+        "/mnt/boot/loader/entries/arch.conf",
+        "/mnt/boot/loader/entries/arch-fallback.conf",
+    }
+    entry = files["/mnt/boot/loader/entries/arch.conf"]
+    assert "linux   /vmlinuz-linux" in entry
+    assert "initrd  /intel-ucode.img" in entry
+    assert "initrd  /initramfs-linux.img" in entry
+    assert "options root=PARTUUID=abcd-1234 rw" in entry
+    fallback = files["/mnt/boot/loader/entries/arch-fallback.conf"]
+    assert "initramfs-linux-fallback.img" in fallback
+    loader = files["/mnt/boot/loader/loader.conf"]
+    assert "default   arch.conf" in loader
+
+
+def test_systemd_boot_files_without_ucode():
+    files = steps.systemd_boot_files(kernel="linux-lts",
+                                     root_arg="/dev/sda2", ucode=None)
+    entry = files["/mnt/boot/loader/entries/arch.conf"]
+    assert "ucode" not in entry
+    assert "vmlinuz-linux-lts" in entry
+    assert "options root=/dev/sda2 rw" in entry
+
+
+def test_systemd_boot_files_require_root_arg():
+    with pytest.raises(ValueError):
+        steps.systemd_boot_files(kernel="linux", root_arg="")
 
 
 def test_export_configuration_path():

@@ -86,3 +86,31 @@ def test_official_packages_not_in_aur(registry):
     assert "firefox" not in plan.aur_packages
     # KDE itself is official.
     assert "plasma" in plan.packages or any("plasma" in p for p in plan.packages)
+
+
+def test_grub_bootloader_adds_packages(registry):
+    """GRUB needs the grub package + efibootmgr; base does not include them."""
+    resolution = Resolver(registry).resolve(None, ["network"], [])
+    plan = build_plan(resolution, bootloader="grub")
+    pkgs = set(plan.all_packages())
+    assert "grub" in pkgs
+    assert "efibootmgr" in pkgs
+
+
+def test_systemd_boot_needs_no_extra_packages(registry):
+    resolution = Resolver(registry).resolve(None, ["network"], [])
+    plan = build_plan(resolution, bootloader="systemd-boot")
+    pkgs = set(plan.all_packages())
+    assert "grub" not in pkgs
+
+
+def test_btrfs_filesystem_adds_btrfs_progs(registry):
+    resolution = Resolver(registry).resolve(None, ["network"], [])
+    plan = build_plan(resolution, filesystem="btrfs")
+    assert "btrfs-progs" in set(plan.all_packages())
+
+
+def test_ext4_does_not_pull_btrfs_progs(registry):
+    resolution = Resolver(registry).resolve(None, ["network"], [])
+    plan = build_plan(resolution, filesystem="ext4")
+    assert "btrfs-progs" not in set(plan.all_packages())
