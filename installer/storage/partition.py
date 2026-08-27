@@ -45,12 +45,24 @@ def mkfs_command(fs: str, partition: str) -> list[str]:
     raise ValueError(f"unsupported filesystem: {fs}")
 
 
-def mount_commands(device: str, fs: str, efi_part: str,
+def mount_commands(root_partition: str, fs: str, efi_partition: str,
                    root_mount: str = "/mnt") -> list[list[str]]:
-    cmds = [["mount", device, root_mount]]
-    cmds.append(["mkdir", "-p", f"{root_mount}/boot/efi"])
-    cmds.append(["mount", efi_part, f"{root_mount}/boot/efi"])
-    return cmds
+    """Build commands to mount the freshly-created partitions.
+
+    The first argument is the *root partition* (e.g. /dev/sda2), not the
+    whole device — mounting a raw device on /mnt destroys any existing
+    partition table contents and breaks /boot/efi. The companion
+    Partitioner.commands() always passes plan.root_partition.
+    """
+    if not root_partition or not efi_partition:
+        raise ValueError("both root_partition and efi_partition are required")
+    if root_partition == efi_partition:
+        raise ValueError("root_partition and efi_partition must differ")
+    return [
+        ["mount", root_partition, root_mount],
+        ["mkdir", "-p", f"{root_mount}/boot/efi"],
+        ["mount", efi_partition, f"{root_mount}/boot/efi"],
+    ]
 
 
 def umount_all(root_mount: str = "/mnt") -> list[list[str]]:
@@ -58,6 +70,46 @@ def umount_all(root_mount: str = "/mnt") -> list[list[str]]:
         [shutil.which("umount") or "umount", "-R", f"{root_mount}/boot/efi"],
         [shutil.which("umount") or "umount", "-R", root_mount],
     ]
+
+
+def _size_to_gb(size_str: str | None) -> int | None:
+    """Parse an lsblk size string like '500G', '1.5T' into integer GB."""
+    if not size_str:
+        return None
+    s = size_str.strip().upper()
+    if not s:
+        return None
+    try:
+        if s.endswith("T"):
+            return int(float(s[:-1]) * 1024)
+        if s.endswith("G"):
+            return int(float(s[:-1]))
+        if s.endswith("M"):
+            return int(float(s[:-1]) / 1024)
+        return int(s)
+    except (ValueError, IndexError):
+        return None
+
+
+def is_safe_install_target(device: StorageDevice,
+                           min_size_gb: int = 8) -> bool:
+    """True if a storage device is a valid install target.
+
+    Filters out loopbacks (the live ISO's own device), RAM disks, optical
+    drives, and anything smaller than the minimum safe install size.
+    """
+    name = (device.name or "").strip()
+    if not name:
+        return False
+    lower = name.lower()
+    if lower.startswith(("loop", "ram", "zram", "sr", "fd")):
+        return False
+    if device.removable:
+        return False
+    size_gb = _size_to_gb(device.size)
+    if size_gb is not None and size_gb < min_size_gb:
+        return False
+    return True
 
 
 class Partitioner:
@@ -75,9 +127,6 @@ class Partitioner:
         self.log: list[str] = []
 
     def plan(self) -> PartitionPlan:
-        suffix = "" if self.device[-1].isdigit() else ""
-        # nvme0n1p1 style vs sda1 style is handled by lsblk name lookup at
-        # runtime; for generation we assume standard naming.
         base = self.device
         if base.startswith("/dev/nvme") or base.startswith("/dev/mmcblk"):
             efi = f"{base}p1"
@@ -109,10 +158,28 @@ class Partitioner:
             )
         import subprocess
 
-        for cmd in self.commands():
+        commands = self.commands()
+        for i, cmd in enumerate(commands):
             proc = subprocess.run(cmd, capture_output=True, text=True)
             self.log.append(" ".join(cmd))
             if proc.returncode != 0:
                 self.log.append(proc.stderr.strip())
+                # Best-effort rollback: try to unmount whatever was mounted
+                # and mark the disk as needing manual cleanup.
+                for later in commands[i + 1:]:
+                    if later and later[0] == "mount":
+                        self.log.append("rollback: skipping later mount "
+                                        + " ".join(later))
+                self._try_umount("/mnt/boot/efi")
+                self._try_umount("/mnt")
                 return proc.returncode
         return 0
+
+    @staticmethod
+    def _try_umount(target: str) -> None:
+        import subprocess
+        try:
+            subprocess.run(["umount", "-R", target], capture_output=True,
+                           text=True, timeout=10)
+        except (OSError, subprocess.TimeoutExpired):
+            pass

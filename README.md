@@ -9,6 +9,13 @@ environments, services, and system roles.
 > Build the Linux system the user actually wants instead of installing a
 > generic system and removing everything they do not want.
 
+**Current status (v0.2.0):** Arch Linux on x86_64 with systemd. The
+graphical installer and the `modular install <modular.yaml>` CLI both
+drive the same Python orchestrator (`installer/installation/orchestrator.py`)
+so configuration-based reproduction is fully supported. Other base
+distributions, ARM64 ISO builds, and alternate init systems are tracked
+in the roadmap but not yet implemented in the install executor.
+
 ## Repository Layout
 
 ```text
@@ -17,6 +24,10 @@ modular-linux/
 ├── Makefile            builds bin/ (C hardware prober + Go CLI)
 ├── iso/                archiso profile (live environment)
 ├── installer/          Python + GTK3 graphical installer
+│   ├── installation/   headless orchestrator (cli + GUI both use it)
+│   ├── hardware/       detection (Python + C binary)
+│   ├── storage/        partitioning helpers
+│   └── ui/             GTK3 system builder
 ├── engine/             profile engine, resolver, validation (Python)
 ├── cli/                Python CLI fallback (python -m cli)
 ├── cmd/modular/        Go CLI -> bin/modular (static binary)
@@ -36,13 +47,19 @@ scripts/setup-dev.sh
 
 source .venv/bin/activate
 
-./bin/modular list roles                 # general/developer/gaming/server/...
-./bin/modular list desktops              # 9 DEs + 7 window managers
-./bin/modular resolve kde firefox audio  # resolution demo
+make                                       # builds bin/modular + bin/modular-detect
+./bin/modular list roles                   # general/developer/gaming/server/...
+./bin/modular list desktops                # 9 DEs + 7 window managers
+./bin/modular resolve kde firefox audio    # resolution demo
 python -m cli generate-plan examples/developer-workstation.yaml
 
 # graphical system builder (needs a display; Xvfb works headless)
 python installer/main.py
+
+# headless configuration-driven install
+MODULAR_INSTALL_DEVICE=/dev/sda \
+MODULAR_INSTALL_PASSWORD=secret \
+./bin/modular install examples/developer-workstation.yaml
 ```
 
 ## Configuration Example (v1)

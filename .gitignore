@@ -1,11 +1,10 @@
 out/
+dist/
 bin/
 .venv/
 __pycache__/
 *.pyc
 .iso
 cmd/modular/modular
-dist/*.iso
-dist/*.log
 modular-installer.log
 .pytest_cache/

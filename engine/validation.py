@@ -6,26 +6,20 @@ from typing import Any
 
 import yaml
 
-from .errors import ConfigurationError
-from .packages import (
+from .constants import (
+    KNOWN_HARDWARE,
+    KNOWN_ROLES,
     SUPPORTED_BOOTLOADERS,
+    SUPPORTED_ENVIRONMENTS,
     SUPPORTED_FILESYSTEMS,
     SUPPORTED_GPU_MODES,
     SUPPORTED_KERNELS,
     SUPPORTED_LOGIN_MANAGERS,
     SUPPORTED_SHELLS,
 )
+from .errors import ConfigurationError
 from .profiles import ProfileRegistry
 
-SUPPORTED_DESKTOPS = ("kde", "gnome", "xfce", "cinnamon", "mate", "lxqt",
-                      "lxde", "budgie", "cosmic", "hyprland")
-SUPPORTED_WMS = ("sway", "i3", "openbox", "awesome", "bspwm", "river",
-                 "labwc", "none")
-SUPPORTED_ENVIRONMENTS = SUPPORTED_DESKTOPS + SUPPORTED_WMS
-KNOWN_ROLES = ("general", "developer", "ai-ml", "gaming", "creator",
-               "student", "server", "security")
-KNOWN_HARDWARE = ("network", "wifi", "bluetooth", "audio", "webcam",
-                  "printing", "scanner", "vpn")
 DISPLAY_PROTOCOLS = ("wayland", "x11", "automatic")
 
 

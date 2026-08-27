@@ -9,13 +9,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict
 
-SUPPORTED_KERNELS = ("linux", "linux-lts", "linux-zen", "linux-hardened")
-SUPPORTED_FILESYSTEMS = ("ext4", "btrfs")
-SUPPORTED_BOOTLOADERS = ("systemd-boot", "grub")
-SUPPORTED_SHELLS = ("bash", "zsh", "fish")
-SUPPORTED_GPU_MODES = ("automatic", "open-source", "nvidia-proprietary",
-                       "manual")
-SUPPORTED_LOGIN_MANAGERS = ("sddm", "gdm", "lightdm", "ly", "none")
+from .constants import (
+    SUPPORTED_BOOTLOADERS,
+    SUPPORTED_FILESYSTEMS,
+    SUPPORTED_GPU_MODES,
+    SUPPORTED_KERNELS,
+    SUPPORTED_LOGIN_MANAGERS,
+    SUPPORTED_SHELLS,
+    TRUSTED_SOURCES,
+    THIRD_PARTY_SOURCES,
+)
 
 # Derived per spec §27 unless the user overrides it.
 DESKTOP_LOGIN_MANAGER = {
@@ -31,9 +34,6 @@ DESKTOP_LOGIN_MANAGER = {
     "hyprland": "ly",
     "sway": "ly",
 }
-
-TRUSTED_SOURCES = ("arch",)
-THIRD_PARTY_SOURCES = ("aur", "flatpak", "appimage")
 
 
 def base_packages(kernel: str = "linux") -> list[str]:
@@ -52,6 +52,7 @@ class InstallationPlan:
     base_packages: list[str] = field(default_factory=lambda: base_packages())
     packages: list[str] = field(default_factory=list)
     aur_packages: list[str] = field(default_factory=list)
+    flatpak_packages: list[str] = field(default_factory=list)
     services: list[str] = field(default_factory=list)
     filesystem: str = "ext4"
     bootloader: str = "systemd-boot"
@@ -95,14 +96,36 @@ def build_plan(resolution,
                sources: dict[str, bool] | None = None) -> InstallationPlan:
     sources = sources or {"arch": True, "aur": False, "flatpak": False,
                           "appimage": False}
-    official, aur = [], []
+    official: list[str] = []
+    aur: list[str] = []
+    flatpak: list[str] = []
+    # Map package -> source, so packages pulled in transitively by an
+    # AUR profile (e.g. an AUR helper or dependency) keep the right tag.
+    pkg_source: dict[str, str] = {}
+    for profile in getattr(resolution, "selected", []):
+        src = getattr(profile, "source", None)
+        if src in ("aur", "flatpak"):
+            for p in profile.packages:
+                pkg_source.setdefault(p, src)
     for pkg in resolution.packages:
-        (aur if pkg.startswith("aur:") else official).append(pkg)
+        tag = pkg_source.get(pkg)
+        if tag == "aur" or pkg.startswith("aur:"):
+            name = pkg.removeprefix("aur:")
+            if name not in aur:
+                aur.append(name)
+        elif tag == "flatpak" or pkg.startswith("flatpak:"):
+            name = pkg.removeprefix("flatpak:")
+            if name not in flatpak:
+                flatpak.append(name)
+        else:
+            if pkg not in official:
+                official.append(pkg)
     return InstallationPlan(
         kernel=kernel,
         base_packages=base_packages(kernel),
         packages=official,
         aur_packages=aur,
+        flatpak_packages=flatpak,
         services=list(resolution.services),
         filesystem=filesystem,
         bootloader=bootloader,

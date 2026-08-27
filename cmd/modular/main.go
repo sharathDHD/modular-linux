@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -18,7 +20,9 @@ func runCommand(bin string) ([]byte, error) {
 	return out, nil
 }
 
-const version = "1.0.0"
+// version is set at build time via -ldflags "-X main.version=..."
+// (see Makefile). The default matches VERSION on disk.
+var version = "0.0.0"
 
 func usage() {
 	fmt.Print(`modular - Modular Linux CLI (v` + version + `)
@@ -29,11 +33,17 @@ Usage:
   modular resolve [desktop] [features...] [apps...]        Resolve a selection
   modular validate <modular.yaml>                          Validate a configuration
   modular generate-plan <modular.yaml>                     Generate installation plan
+  modular install <modular.yaml> [--device /dev/sdX]       Install a configured system
   modular detect-binary                                    Emit raw JSON from prober
   modular version                                          Print version
 
 Environment:
-  MODULAR_PROFILES   Override profiles directory (default: ./profiles)
+  MODULAR_PROFILES       Override profiles directory (default: ./profiles)
+  MODULAR_INSTALL_DEVICE  Default target device (overridden by --device)
+  MODULAR_INSTALL_HOSTNAME  Default hostname
+  MODULAR_INSTALL_LOCALE    Default locale (default: C.UTF-8)
+  MODULAR_INSTALL_TIMEZONE  Default timezone (default: UTC)
+  MODULAR_INSTALL_KEYMAP    Default console keymap (default: us)
 `)
 }
 
@@ -60,12 +70,98 @@ func main() {
 		cmdValidate(reg, args[1:])
 	case "generate-plan":
 		cmdGeneratePlan(reg, args[1:])
+	case "install":
+		cmdInstall(reg, args[1:])
 	case "version", "--version":
 		fmt.Println("modular " + version)
 	default:
 		usage()
 		os.Exit(2)
 	}
+}
+
+func cmdInstall(reg *Registry, args []string) {
+	device := os.Getenv("MODULAR_INSTALL_DEVICE")
+	for i := 0; i < len(args)-1; i++ {
+		if args[i] == "--device" {
+			device = args[i+1]
+		}
+	}
+	if len(args) < 1 {
+		usage()
+		os.Exit(2)
+	}
+	configPath := args[0]
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		fatal(err)
+	}
+	if errs := Validate(cfg, reg); len(errs) > 0 {
+		for _, e := range errs {
+			fmt.Fprintln(os.Stderr, "invalid:", e)
+		}
+		os.Exit(1)
+	}
+	if device == "" {
+		// No device and no env var: refuse to run rather than
+		// accidentally target the live ISO's loopback.
+		fmt.Fprintln(os.Stderr,
+			"refusing to install without a target device: "+
+				"pass --device /dev/sdX or set MODULAR_INSTALL_DEVICE")
+		os.Exit(2)
+	}
+	if !strings.HasPrefix(device, "/dev/") {
+		fmt.Fprintf(os.Stderr, "invalid --device: %s\n", device)
+		os.Exit(2)
+	}
+	// Validate, plan, and defer the destructive steps to the Python
+	// orchestrator (which handles pacstrap/chroot/bootloader/etc).
+	// This keeps a single source of truth for the install sequence.
+	fmt.Printf("validating %s ...\n", configPath)
+	fmt.Println("OK")
+	fmt.Printf("planning install on %s ...\n", device)
+	hw := hardwareForResolution(reg, cfg)
+	res, err := NewResolver(reg).Resolve(
+		desktopOrNone(cfg), hw, cfg.Applications, cfg.Roles)
+	if err != nil {
+		fatal(err)
+	}
+	plan := BuildPlan(cfg, res)
+	out, _ := yaml.Marshal(plan)
+	fmt.Print(string(out))
+	fmt.Println("delegating install to Python orchestrator")
+	pyBin, err := findPythonOrchestrator()
+	if err != nil {
+		fatal(err)
+	}
+	pyArgs := []string{pyBin, configPath,
+		"--device", device,
+		"--non-interactive",
+	}
+	cmd := exec.Command("python3", pyArgs...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "install failed: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func findPythonOrchestrator() (string, error) {
+	exe, _ := os.Executable()
+	candidates := []string{
+		filepath.Join(filepath.Dir(exe), "..", "..",
+			"installer", "installation", "orchestrator.py"),
+		"installer/installation/orchestrator.py",
+	}
+	for _, p := range candidates {
+		if _, err := os.Stat(p); err == nil {
+			return p, nil
+		}
+	}
+	return "", fmt.Errorf(
+		"cannot find Python orchestrator; tried %v", candidates)
 }
 
 func fatal(err error) {

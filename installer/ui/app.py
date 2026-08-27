@@ -14,16 +14,22 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import GLib, Gtk
 
 from engine.configuration import ModularConfiguration
+from engine.constants import (
+    SUPPORTED_BOOTLOADERS, SUPPORTED_FILESYSTEMS, SUPPORTED_KERNELS,
+    SUPPORTED_SHELLS,
+)
 from engine.packages import build_plan, derive_login_manager
 from engine.profiles import default_registry
 from engine.resolver import Resolver
 from installer.hardware.detect import detect
 from installer.logging.setup import get_logger, register_secret
 from installer.installation.steps import (
-    bootloader_commands, enable_service_command, execute_step,
-    genfstab_command, pacstrap_command, user_commands, export_configuration,
+    bootloader_commands, configure_locale, enable_service_command,
+    execute_step, genfstab_command, is_chroot_ready, pacstrap_command,
+    regenerate_initramfs, set_hostname, set_keymap, set_timezone,
+    user_commands, export_configuration,
 )
-from installer.storage.partition import Partitioner
+from installer.storage.partition import Partitioner, is_safe_install_target
 
 PAGES = ["Welcome", "Hardware", "System Type", "Desktop", "Features",
          "Applications", "Advanced", "Services", "User", "Disk", "Summary"]
@@ -41,10 +47,16 @@ GPU_MODES = [("automatic", "Automatic"),
              ("open-source", "Open-source drivers"),
              ("nvidia-proprietary", "NVIDIA proprietary driver"),
              ("manual", "Advanced / manual")]
-KERNELS = ["linux", "linux-lts", "linux-zen", "linux-hardened"]
-SHELLS = ["bash", "zsh", "fish"]
-BOOTLOADERS = ["systemd-boot", "grub"]
-FILESYSTEMS = ["ext4", "btrfs"]
+KERNELS = list(SUPPORTED_KERNELS)
+SHELLS = list(SUPPORTED_SHELLS)
+BOOTLOADERS = list(SUPPORTED_BOOTLOADERS)
+FILESYSTEMS = list(SUPPORTED_FILESYSTEMS)
+LOCALES = ["C.UTF-8", "en_US.UTF-8", "en_GB.UTF-8", "de_DE.UTF-8",
+           "fr_FR.UTF-8", "es_ES.UTF-8", "ja_JP.UTF-8", "zh_CN.UTF-8"]
+TIMEZONES = ["UTC", "Europe/Berlin", "Europe/London", "Europe/Paris",
+             "America/New_York", "America/Los_Angeles", "America/Chicago",
+             "Asia/Kolkata", "Asia/Tokyo", "Asia/Shanghai", "Australia/Sydney"]
+KEYMAPS = ["us", "gb", "de", "fr", "es", "it", "ru", "jp", "in"]
 SERVICES = [("NetworkManager", True), ("bluetooth", True),
             ("pipewire", False), ("sshd", False), ("cups", False),
             ("docker", False), ("libvirtd", False), ("avahi-daemon", False)]
@@ -73,6 +85,8 @@ class InstallerWindow(Gtk.Window):
         self.gpu_radio: dict[str, Gtk.RadioButton] = {}
         self._last_resolution = None
         self._last_plan = None
+        self._last_cfg = None
+        self._building = False
 
         header = Gtk.HeaderBar(title="Modular Linux",
                                subtitle="Build your Arch Linux system")
@@ -102,7 +116,9 @@ class InstallerWindow(Gtk.Window):
         }
         for name in PAGES:
             self.stack.add_titled(builders[name](), name, name)
-        self._refresh_summary()
+        # summary_view is created during page_summary construction; refresh
+        # only after the stack is fully built to avoid the old race.
+        GLib.idle_add(self._refresh_summary)
 
     # ---- pages -------------------------------------------------------
     def page_welcome(self):
@@ -173,11 +189,12 @@ class InstallerWindow(Gtk.Window):
             radio.get_child().set_tooltip_text(profile.description)
             if first is None:
                 first = radio
-            radio.connect("toggled", lambda _c: self._refresh_summary())
+            radio.connect("toggled", self.on_role_toggled)
             self.role_radio[short] = radio
             box.pack_start(radio, False, False, 2)
         custom = Gtk.RadioButton.new_with_label_from_widget(first, "Custom")
         custom.set_active(True)
+        custom.connect("toggled", self.on_role_toggled)
         self.role_radio["custom"] = custom
         box.pack_start(custom, False, False, 2)
         note = Gtk.Label(
@@ -186,6 +203,10 @@ class InstallerWindow(Gtk.Window):
         note.set_line_wrap(True)
         box.pack_start(note, False, False, 10)
         return box
+
+    def on_role_toggled(self, _radio):
+        self.apply_roles_defaults()
+        self._refresh_summary()
 
     def selected_roles(self) -> list[str]:
         return [k for k, r in self.role_radio.items() if r.get_active()
@@ -386,38 +407,98 @@ class InstallerWindow(Gtk.Window):
         return box
 
     def page_user(self):
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        scroll = Gtk.ScrolledWindow()
         grid = Gtk.Grid(column_spacing=10, row_spacing=10)
-        labels = ["Username:", "Full name:", "Password:", "Confirm:"]
-        for row, text in enumerate(labels):
+        scroll.add(grid)
+        outer.pack_start(scroll, True, True, 0)
+
+        def label(text, row):
             lbl = Gtk.Label(label=text)
             lbl.set_halign(Gtk.Align.END)
             grid.attach(lbl, 0, row, 1, 1)
-        self.username_entry = Gtk.Entry()
-        self.fullname_entry = Gtk.Entry()
-        self.password_entry = Gtk.Entry()
-        self.password_entry.set_visibility(False)
-        self.confirm_entry = Gtk.Entry()
-        self.confirm_entry.set_visibility(False)
-        for row, entry in enumerate((self.username_entry, self.fullname_entry,
-                                     self.password_entry, self.confirm_entry)):
-            grid.attach(entry, 1, row, 1, 1)
+
+        def entry(row, password=False, placeholder=""):
+            e = Gtk.Entry()
+            if password:
+                e.set_visibility(False)
+            if placeholder:
+                e.set_placeholder_text(placeholder)
+            grid.attach(e, 1, row, 1, 1)
+            return e
+
+        label("Hostname:", 0)
+        self.hostname_entry = entry(0, placeholder="modular")
+
+        label("Locale:", 1)
+        self.locale_combo = Gtk.ComboBoxText()
+        for loc in LOCALES:
+            self.locale_combo.append_text(loc)
+        self.locale_combo.set_active(0)
+        grid.attach(self.locale_combo, 1, 1, 1, 1)
+
+        label("Timezone:", 2)
+        self.timezone_combo = Gtk.ComboBoxText()
+        for tz in TIMEZONES:
+            self.timezone_combo.append_text(tz)
+        self.timezone_combo.set_active(0)
+        grid.attach(self.timezone_combo, 1, 2, 1, 1)
+
+        label("Keymap:", 3)
+        self.keymap_combo = Gtk.ComboBoxText()
+        for km in KEYMAPS:
+            self.keymap_combo.append_text(km)
+        self.keymap_combo.set_active(0)
+        grid.attach(self.keymap_combo, 1, 3, 1, 1)
+
+        sep1 = Gtk.Separator()
+        grid.attach(sep1, 0, 4, 2, 1)
+
+        label("Username:", 5)
+        self.username_entry = entry(5, placeholder="user")
+        label("Full name:", 6)
+        self.fullname_entry = entry(6, placeholder="User")
+        label("User password:", 7)
+        self.password_entry = entry(7, password=True)
+        label("Confirm:", 8)
+        self.confirm_entry = entry(8, password=True)
+
+        label("Root password:", 9)
+        self.root_password_entry = entry(9, password=True)
+        label("(optional)", 9)
+
         self.admin_check = Gtk.CheckButton(label="Administrator (wheel + sudo)")
         self.admin_check.set_active(True)
-        grid.attach(self.admin_check, 1, 4, 1, 1)
-        return grid
+        grid.attach(self.admin_check, 1, 10, 1, 1)
+
+        for w in (self.hostname_entry, self.fullname_entry,
+                  self.username_entry):
+            w.connect("changed", lambda _e: self._refresh_summary())
+        return outer
 
     def page_disk(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         disk_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         disk_box.pack_start(Gtk.Label(label="Target disk:"), False, False, 0)
         combo = Gtk.ComboBoxText()
-        for dev in detect().storage:
+        all_devices = detect().storage
+        safe = [d for d in all_devices if is_safe_install_target(d)]
+        if not safe:
+            err = Gtk.Label()
+            err.set_markup("<span foreground='red'>"
+                           "No suitable install target found. "
+                           "Connect a disk of at least 8 GB and press "
+                           "Detect Hardware again.</span>")
+            err.set_line_wrap(True)
+            box.pack_start(err, False, False, 4)
+        for dev in safe:
             combo.append_text(
-                f"{dev.name} ({dev.size or '?'}G) {dev.model or ''}".strip())
-        devices = detect().storage
-        if devices:
+                f"/dev/{dev.name} ({dev.size or '?'}G) "
+                f"{dev.model or ''}".strip())
+        if safe:
             combo.set_active(0)
         self.disk_combo = combo
+        self._disk_devices = safe
         disk_box.pack_start(combo, True, True, 0)
         box.pack_start(disk_box, False, False, 0)
         warn = Gtk.Label()
@@ -428,7 +509,7 @@ class InstallerWindow(Gtk.Window):
 
     def selected_device(self) -> str:
         text = self.disk_combo.get_active_text() or ""
-        return "/dev/" + text.split()[0] if text else ""
+        return text.split()[0] if text else ""
 
     def page_summary(self):
         scroller = Gtk.ScrolledWindow()
@@ -559,6 +640,10 @@ class InstallerWindow(Gtk.Window):
             lines.append(f"Shell      : {cfg.shell_type}")
             lines.append(f"Filesystem : {cfg.filesystem_type}")
             lines.append(f"Bootloader : {cfg.bootloader_type}")
+            lines.append(f"Hostname   : {self._hostname_or_default()}")
+            lines.append(f"Locale     : {self._locale_or_default()}")
+            lines.append(f"Timezone   : {self._timezone_or_default()}")
+            lines.append(f"Keymap     : {self._keymap_or_default()}")
             lines.append("")
             lines += [f"  - {p}" for p in plan.all_packages()]
             self._last_resolution = self.resolver
@@ -568,28 +653,77 @@ class InstallerWindow(Gtk.Window):
         except Exception as exc:
             self.summary_view.get_buffer().set_text(f"error: {exc}")
 
+    def _hostname_or_default(self) -> str:
+        if hasattr(self, "hostname_entry"):
+            v = self.hostname_entry.get_text().strip()
+            if v:
+                return v
+        return "modular"
+
+    def _locale_or_default(self) -> str:
+        if hasattr(self, "locale_combo"):
+            return self.locale_combo.get_active_text() or LOCALES[0]
+        return LOCALES[0]
+
+    def _timezone_or_default(self) -> str:
+        if hasattr(self, "timezone_combo"):
+            return self.timezone_combo.get_active_text() or TIMEZONES[0]
+        return TIMEZONES[0]
+
+    def _keymap_or_default(self) -> str:
+        if hasattr(self, "keymap_combo"):
+            return self.keymap_combo.get_active_text() or KEYMAPS[0]
+        return KEYMAPS[0]
+
     # ---- installation --------------------------------------------------
     def on_install(self, _btn):
         password = self.password_entry.get_text()
         if password != self.confirm_entry.get_text():
-            self._error("Passwords do not match")
+            self._error("User passwords do not match")
+            return
+        root_pw = self.root_password_entry.get_text() or ""
+        confirm_root = getattr(self, "root_confirm_entry", None)
+        if confirm_root is not None and root_pw != confirm_root.get_text():
+            self._error("Root passwords do not match")
             return
         register_secret(password)
+        if root_pw:
+            register_secret(root_pw)
+        if self._building:
+            self._error("An installation is already in progress")
+            return
         device = self.selected_device()
+        if not device:
+            self._error("No target disk selected")
+            return
         dlg = Gtk.MessageDialog(transient_for=self, modal=True,
                                 message_type=Gtk.MessageType.WARNING,
                                 buttons=Gtk.ButtonsType.YES_NO,
-                                text=f"Erase {device or '?'} and install "
+                                text=f"Erase {device} and install "
                                      "Modular Linux?")
         response = dlg.run()
         dlg.destroy()
         if response != Gtk.ResponseType.YES:
             return
-        threading.Thread(target=self._install_worker, args=(password,),
-                         daemon=True).start()
+        self._building = True
+        threading.Thread(target=self._install_worker,
+                         args=(password, root_pw), daemon=True).start()
 
-    def _install_worker(self, password: str):
+    def _run_steps(self, log, steps, label, allow_continue=True):
+        for cmd in steps:
+            rc, out = execute_step(cmd, timeout=300)
+            if rc != 0:
+                msg = f"{label} failed: {out}"
+                if allow_continue:
+                    log.warning(msg)
+                else:
+                    raise RuntimeError(msg)
+            else:
+                log.info("%s ok: %s", label, " ".join(cmd[:3]))
+
+    def _install_worker(self, password: str, root_password: str):
         log = self.log
+        mounted = False
         try:
             plan = self._last_plan
             cfg = self._last_cfg
@@ -597,27 +731,64 @@ class InstallerWindow(Gtk.Window):
             part = Partitioner(device, cfg.filesystem_type, dry_run=False)
             if part.execute(confirm=True) != 0:
                 raise RuntimeError("partitioning failed")
+            mounted = True
             rc, out = execute_step(
-                pacstrap_command(plan.all_packages()))
+                pacstrap_command(plan.all_packages()), timeout=1800)
             if rc != 0:
                 raise RuntimeError(f"pacstrap failed: {out}")
-            execute_step(["mkdir", "-p", "/mnt/etc"])
+            if not is_chroot_ready("/mnt"):
+                raise RuntimeError("pacstrap did not populate /mnt")
+            execute_step(["mkdir", "-p", "/mnt/etc"], timeout=30)
             rc, _ = execute_step(
                 ["arch-chroot", "/mnt", "/bin/bash", "-c",
-                 genfstab_command()])
-            username = self.username_entry.get_text() or "user"
-            cmds = user_commands(username, self.fullname_entry.get_text(),
-                                 password,
+                 genfstab_command()], timeout=60)
+            if rc != 0:
+                raise RuntimeError("genfstab failed")
+            hostname = self._hostname_or_default()
+            for cmd in set_hostname(hostname):
+                rc, out = execute_step(cmd, timeout=30)
+                if rc != 0:
+                    raise RuntimeError(f"hostname setup failed: {out}")
+            for cmd in set_timezone(self._timezone_or_default()):
+                rc, out = execute_step(cmd, timeout=30)
+                if rc != 0:
+                    raise RuntimeError(f"timezone setup failed: {out}")
+            for cmd in set_keymap(self._keymap_or_default()):
+                rc, out = execute_step(cmd, timeout=30)
+                if rc != 0:
+                    raise RuntimeError(f"keymap setup failed: {out}")
+            for cmd in configure_locale(self._locale_or_default()):
+                rc, out = execute_step(cmd, timeout=120)
+                if rc != 0:
+                    raise RuntimeError(f"locale setup failed: {out}")
+            username = self.username_entry.get_text().strip() or "user"
+            fullname = self.fullname_entry.get_text().strip() or username
+            cmds = user_commands(username, fullname, password,
+                                 root_password=root_password or None,
                                  administrator=self.admin_check.get_active())
-            marker = getattr(cmds, "marker", None)
-            stdin_text = None
-            for i, cmd in enumerate(cmds):
-                if marker and i == len(cmds) - 1:
-                    u, p = marker["__stdin_password__"]
-                    stdin_text = f"{u}:{p}\n"
-                rc, out = execute_step(cmd, stdin_text)
+            marker = getattr(cmds, "marker", {})
+            user_marker = marker.get("__stdin_user__")
+            root_marker = marker.get("__stdin_root__", "")
+            chpasswd_index = 0
+            for cmd in cmds:
+                if cmd[-2:] == ["chpasswd"]:
+                    if chpasswd_index == 0 and user_marker:
+                        u, p = user_marker
+                        stdin_text = f"{u}:{p}\n"
+                    elif chpasswd_index == 1 and root_marker:
+                        stdin_text = f"root:{root_marker}\n"
+                    else:
+                        stdin_text = None
+                    chpasswd_index += 1
+                else:
+                    stdin_text = None
+                rc, out = execute_step(cmd, stdin_text, timeout=120)
                 if rc != 0:
                     raise RuntimeError(f"user setup failed: {out}")
+            for cmd in regenerate_initramfs(cfg.kernel):
+                rc, out = execute_step(cmd, timeout=300)
+                if rc != 0:
+                    raise RuntimeError(f"initramfs regen failed: {out}")
             services = set(plan.services)
             services |= {s for s, c in self.service_checks.items()
                          if c.get_active()}
@@ -625,22 +796,33 @@ class InstallerWindow(Gtk.Window):
                     ("none", "ly", "cosmic-greeter"):
                 services.add(plan.login_manager)
             for svc in sorted(services):
-                rc, out = execute_step(enable_service_command(svc))
+                rc, out = execute_step(enable_service_command(svc),
+                                       timeout=60)
                 if rc != 0:
                     log.warning("could not enable %s: %s", svc, out)
             for cmd in bootloader_commands(cfg.bootloader_type):
-                rc, out = execute_step(cmd)
+                rc, out = execute_step(cmd, timeout=300)
                 if rc != 0:
                     raise RuntimeError("bootloader failed: " + out)
             files = export_configuration(_dump_yaml(cfg))
+            execute_step(["mkdir", "-p", "/mnt/etc/modular"], timeout=30)
             for path, content in files.items():
-                with open(path, "w", encoding="utf-8") as fh:
-                    fh.write(content)
+                execute_step(["tee", path], stdin_text=content, timeout=30)
             log.info("installation completed successfully on %s", device)
             GLib.idle_add(self._show_done, True, "")
         except Exception as exc:
             log.error("installation failed: %s", exc)
+            # Best-effort cleanup: umount what we may have mounted so the
+            # next attempt starts from a clean state.
+            if mounted:
+                for target in ("/mnt/boot/efi", "/mnt"):
+                    try:
+                        execute_step(["umount", "-R", target], timeout=15)
+                    except Exception:
+                        pass
             GLib.idle_add(self._show_done, False, str(exc))
+        finally:
+            self._building = False
 
     def _show_done(self, ok: bool, message: str):
         dlg = Gtk.MessageDialog(transient_for=self, modal=True,

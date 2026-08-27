@@ -1,10 +1,9 @@
-# Modular Linux — v0.1 Technical Specification
+# Modular Linux — v0.2 Technical Specification
 
 **Project:** Modular Linux  
-**Version:** 0.1  
-**Status:** Initial Development Specification  
-**Target Base:** Arch Linux  
-**Architecture:** x86_64 / UEFI  
+**Version:** 0.2  
+**Status:** Improvement and enhancement phase  
+**Target Base:** Arch Linux (primary), with plans for multi-base support  
 **Primary Goal:** Build a minimal, modular Linux installation system that allows users to construct an operating system from a base system, hardware capabilities, desktop environments, and application profiles.
 
 ---

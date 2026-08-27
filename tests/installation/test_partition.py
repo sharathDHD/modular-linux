@@ -2,6 +2,7 @@ import pytest
 
 from installer.storage.partition import (
     EFI_SIZE_MIB, PartitionPlan, Partitioner, mkfs_command, mount_commands,
+    is_safe_install_target,
 )
 
 
@@ -63,3 +64,32 @@ def test_mkfs_btrfs():
 def test_mount_order():
     cmds = mount_commands("/dev/vda2", "ext4", "/dev/vda1", root_mount="/mnt")
     assert cmds[0] == ["mount", "/dev/vda2", "/mnt"]
+
+
+def test_mount_rejects_same_partition():
+    import pytest
+    with pytest.raises(ValueError):
+        mount_commands("/dev/vda1", "ext4", "/dev/vda1")
+
+
+def test_mount_rejects_empty_args():
+    import pytest
+    with pytest.raises(ValueError):
+        mount_commands("", "ext4", "/dev/vda1")
+    with pytest.raises(ValueError):
+        mount_commands("/dev/vda2", "ext4", "")
+
+
+def test_safe_install_target_filters():
+    from installer.hardware.detect import StorageDevice
+    assert is_safe_install_target(StorageDevice(name="sda", size="500G"))
+    assert is_safe_install_target(StorageDevice(name="nvme0n1", size="1T"))
+    assert not is_safe_install_target(
+        StorageDevice(name="loop0", size="2G"))  # live ISO loopback
+    assert not is_safe_install_target(
+        StorageDevice(name="sr0", size="700M"))  # optical
+    assert not is_safe_install_target(
+        StorageDevice(name="sdc", size="4G"))  # too small
+    assert not is_safe_install_target(StorageDevice(name="", size="100G"))
+    assert not is_safe_install_target(
+        StorageDevice(name="sdc", size=None, removable=True))  # USB stick

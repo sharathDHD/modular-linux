@@ -60,24 +60,25 @@ type Config struct {
 
 // InstallationPlan mirrors engine.packages.InstallationPlan (spec §14/§29).
 type InstallationPlan struct {
-	Version      string   `yaml:"version"`
-	Distribution string   `yaml:"distribution"`
-	Architecture string   `yaml:"architecture"`
-	Init         string   `yaml:"init"`
-	Kernel       string   `yaml:"kernel"`
-	BasePackages []string `yaml:"base_packages"`
-	Packages     []string `yaml:"packages"`
-	AURPackages  []string `yaml:"aur_packages"`
-	Services     []string `yaml:"services"`
-	Filesystem   string   `yaml:"filesystem"`
-	Bootloader   string   `yaml:"bootloader"`
-	Shell        string   `yaml:"shell"`
-	Display      string   `yaml:"display,omitempty"`
-	LoginManager string   `yaml:"login_manager,omitempty"`
-	Desktop      string   `yaml:"desktop,omitempty"`
-	Roles        []string `yaml:"roles,omitempty"`
-	Hardware     []string `yaml:"hardware,omitempty"`
-	Sources      map[string]bool `yaml:"sources"`
+	Version          string   `yaml:"version"`
+	Distribution     string   `yaml:"distribution"`
+	Architecture     string   `yaml:"architecture"`
+	Init             string   `yaml:"init"`
+	Kernel           string   `yaml:"kernel"`
+	BasePackages     []string `yaml:"base_packages"`
+	Packages         []string `yaml:"packages"`
+	AURPackages      []string `yaml:"aur_packages"`
+	FlatpakPackages  []string `yaml:"flatpak_packages"`
+	Services         []string `yaml:"services"`
+	Filesystem       string   `yaml:"filesystem"`
+	Bootloader       string   `yaml:"bootloader"`
+	Shell            string   `yaml:"shell"`
+	Display          string   `yaml:"display,omitempty"`
+	LoginManager     string   `yaml:"login_manager,omitempty"`
+	Desktop          string   `yaml:"desktop,omitempty"`
+	Roles            []string `yaml:"roles,omitempty"`
+	Hardware         []string `yaml:"hardware,omitempty"`
+	Sources          map[string]bool `yaml:"sources"`
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -297,9 +298,41 @@ func BuildPlan(c *Config, res *ResolutionResult) *InstallationPlan {
 	if lm := deriveLoginManager(desktop, c.Desktop.LoginManager); lm != "" {
 		p.LoginManager = lm
 	}
+	// Route AUR/Flatpak packages to their dedicated lists based on the
+	// source field of the originating profile, so the executor knows
+	// which install backend to use.
+	pkgSource := map[string]string{}
+	for _, sel := range res.Selected {
+		if sel.Source == "aur" || sel.Source == "flatpak" {
+			for _, sp := range sel.Packages {
+				pkgSource[sp] = sel.Source
+			}
+		}
+	}
 	for _, pkg := range res.Packages {
-		if strings.HasPrefix(pkg, "aur:") {
-			p.AURPackages = append(p.AURPackages, strings.TrimPrefix(pkg, "aur:"))
+		switch {
+		case strings.HasPrefix(pkg, "aur:"):
+			name := strings.TrimPrefix(pkg, "aur:")
+			if !contains(p.AURPackages, name) {
+				p.AURPackages = append(p.AURPackages, name)
+			}
+		case strings.HasPrefix(pkg, "flatpak:"):
+			name := strings.TrimPrefix(pkg, "flatpak:")
+			if !contains(p.FlatpakPackages, name) {
+				p.FlatpakPackages = append(p.FlatpakPackages, name)
+			}
+		case pkgSource[pkg] == "aur":
+			if !contains(p.AURPackages, pkg) {
+				p.AURPackages = append(p.AURPackages, pkg)
+			}
+		case pkgSource[pkg] == "flatpak":
+			if !contains(p.FlatpakPackages, pkg) {
+				p.FlatpakPackages = append(p.FlatpakPackages, pkg)
+			}
+		default:
+			if !contains(p.Packages, pkg) {
+				p.Packages = append(p.Packages, pkg)
+			}
 		}
 	}
 	return p

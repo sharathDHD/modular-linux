@@ -191,20 +191,33 @@ def detect_storage() -> list[StorageDevice]:
 
 
 def detect_ethernet() -> bool:
+    """Detect the presence of a wired (non-wireless) network interface.
+
+    A real Ethernet interface must:
+    * be a non-loopback, non-wireless sysfs interface
+    * have a PCI device parent whose class is 0x0200 (network controller)
+    * OR be a USB Ethernet gadget (driver usb)
+    Bridges, veth, dummy, tunnel interfaces are excluded.
+    """
     try:
         for iface in os.listdir("/sys/class/net"):
             if iface == "lo":
                 continue
-            device = os.path.realpath(f"/sys/class/net/{iface}/device")
-            class_path = os.path.join(device, "class")
-            cls = _read(class_path)
-            # PCI class 02 = network controller; distinguish from wireless via wireless dir
-            if os.path.isdir(f"/sys/class/net/{iface}/wireless"):
+            if iface.startswith(("veth", "br-", "docker", "virbr",
+                                 "tun", "tap", "dummy", "bond", "vlan",
+                                 "vxlan", "wg", "tailscale", "wg-")):
                 continue
-            if cls is None or True:
-                # presence of a wired interface without wireless dir
-                if not os.path.isdir(f"/proc/sys/net/ipv4/conf/{iface}"):
-                    continue
+            if os.path.isdir(f"/sys/class/net/{iface}/wireless") or \
+                    os.path.isdir(f"/sys/class/net/{iface}/phy80211"):
+                continue
+            device = os.path.realpath(f"/sys/class/net/{iface}/device")
+            if not os.path.isdir(device):
+                continue
+            cls = _read(os.path.join(device, "class"))
+            if cls is None:
+                continue
+            cls = cls.strip().lower()
+            if cls.startswith("0x02"):
                 return True
     except OSError:
         pass
@@ -249,9 +262,30 @@ def detect_audio() -> bool:
 
 
 def detect_webcam() -> bool:
+    """Detect the presence of a V4L2 capture device (not just any video node)."""
     try:
         for entry in os.listdir("/sys/class/video4linux"):
-            return True
+            devpath = f"/sys/class/video4linux/{entry}/device"
+            uevent = _read(f"{devpath}/../uevent") or _read(
+                f"/sys/class/video4linux/{entry}/uevent")
+            cap = _read(f"/sys/class/video4linux/{entry}/device/capabilities")
+            if not cap:
+                # Try alternate sysfs locations
+                cap = _read(f"/sys/class/video4linux/{entry}/capabilities")
+            # V4L2_CAP_VIDEO_CAPTURE = 0x00000001 in the lower 21 bits of the
+            # first capability word. Most webcams expose it via either path.
+            if cap:
+                first_word = cap.split()
+                if first_word:
+                    try:
+                        if int(first_word[0], 0) & 0x1:
+                            return True
+                    except ValueError:
+                        pass
+            # Fallback heuristic: /dev/video* with a non-empty device dir
+            # is almost always a real capture endpoint on consumer hardware.
+            if os.path.isdir(devpath) and os.listdir(devpath):
+                return True
     except OSError:
         pass
     output = _run(["lsusb"])

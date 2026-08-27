@@ -8,11 +8,14 @@ same commands for development environments without a Go toolchain.
     python -m cli resolve kde firefox audio
     python -m cli validate examples/modular.yaml
     python -m cli generate-plan examples/modular.yaml
+    python -m cli install examples/modular.yaml
 """
 
 from __future__ import annotations
 
+import getpass
 import os
+import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -132,7 +135,75 @@ def main(argv: list[str]) -> int:
         print(yaml.safe_dump(plan.to_dict(), sort_keys=False))
         return 0
 
+    if cmd == "install" and rest:
+        return _cmd_install(rest[0])
+
     return _usage()
+
+
+def _cmd_install(config_path: str) -> int:
+    """Run a headless installation from a modular.yaml.
+
+    This is the configuration-driven reproduction path promised by the
+    spec (spec §21, §54-§55). It validates the config, resolves the
+    plan, then drives the same orchestrator the GUI uses.
+
+    Required prompts are interactive (passwords, target disk). On a
+    non-interactive stdin, set MODULAR_INSTALL_PASSWORD and
+    MODULAR_INSTALL_DEVICE in the environment.
+    """
+    data = load_configuration(config_path)
+    errors = validate(data, default_registry())
+    if errors:
+        for e in errors:
+            print("INVALID:", e, file=sys.stderr)
+        return 1
+    cfg = ModularConfiguration.from_dict(data)
+
+    # Resolve device
+    device = os.environ.get("MODULAR_INSTALL_DEVICE")
+    if not device:
+        try:
+            device = input("Target disk (e.g. /dev/sda): ").strip()
+        except EOFError:
+            print("error: no target device provided", file=sys.stderr)
+            return 2
+    if not device.startswith("/dev/"):
+        print(f"error: invalid target device: {device!r}", file=sys.stderr)
+        return 2
+
+    # Resolve user / passwords
+    username = "user"
+    if cfg.applications or cfg.roles or True:
+        try:
+            entered = input("Username [user]: ").strip()
+            if entered:
+                username = entered
+        except EOFError:
+            pass
+
+    password = os.environ.get("MODULAR_INSTALL_PASSWORD")
+    if not password:
+        try:
+            password = getpass.getpass("User password: ")
+            confirm = getpass.getpass("Confirm password: ")
+            if password != confirm:
+                print("error: passwords do not match", file=sys.stderr)
+                return 2
+        except (EOFError, KeyboardInterrupt):
+            print("error: no password provided", file=sys.stderr)
+            return 2
+    if not password:
+        print("error: empty password is not allowed", file=sys.stderr)
+        return 2
+
+    root_password = os.environ.get("MODULAR_INSTALL_ROOT_PASSWORD", "")
+
+    from installer.installation.orchestrator import run_installation
+    return run_installation(cfg=cfg, device=device, username=username,
+                            full_name=username.title(),
+                            user_password=password,
+                            root_password=root_password or None)
 
 
 def resolve_gpu(registry, cfg) -> str | None:

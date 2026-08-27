@@ -58,3 +58,31 @@ def test_services_normalized():
         ["NetworkManager", "sddm"]
     cmds = systemd_enable_commands(["bluetooth"])
     assert cmds == [["systemctl", "--root", "/mnt", "enable", "bluetooth.service"]]
+
+
+def test_aur_packages_routed_separately(registry):
+    """AUR-flagged applications land in aur_packages, not packages."""
+    resolution = Resolver(registry).resolve(
+        None, ["network"], ["app.brave"], roles=[])
+    plan = build_plan(resolution, kernel="linux",
+                      filesystem="ext4", bootloader="systemd-boot",
+                      shell="bash", desktop_id="none",
+                      sources={"arch": True, "aur": True, "flatpak": False,
+                               "appimage": False})
+    assert "brave-bin" in plan.aur_packages
+    assert "brave-bin" not in plan.packages
+
+
+def test_official_packages_not_in_aur(registry):
+    """Official-repo packages stay in packages, not aur_packages."""
+    resolution = Resolver(registry).resolve(
+        "kde", ["network"], ["firefox"], roles=[])
+    plan = build_plan(resolution, kernel="linux",
+                      filesystem="ext4", bootloader="systemd-boot",
+                      shell="bash", desktop_id="kde",
+                      sources={"arch": True, "aur": False, "flatpak": False,
+                               "appimage": False})
+    assert "firefox" in plan.packages
+    assert "firefox" not in plan.aur_packages
+    # KDE itself is official.
+    assert "plasma" in plan.packages or any("plasma" in p for p in plan.packages)
