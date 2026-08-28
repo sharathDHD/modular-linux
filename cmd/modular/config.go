@@ -29,8 +29,8 @@ var knownRoles = map[string]bool{"general": true, "developer": true,
 
 // Config mirrors modular.yaml v1 (spec §30).
 type Config struct {
-	Version  any `yaml:"version"`
-	Base     struct {
+	Version any `yaml:"version"`
+	Base    struct {
 		Distribution string `yaml:"distribution"`
 	} `yaml:"base"`
 	System struct {
@@ -43,9 +43,9 @@ type Config struct {
 		Display      string `yaml:"display"`
 		LoginManager string `yaml:"login_manager"`
 	} `yaml:"desktop"`
-	Hardware     map[string]any  `yaml:"hardware"`
-	Roles        []string        `yaml:"roles"`
-	Applications []string        `yaml:"applications"`
+	Hardware     map[string]any `yaml:"hardware"`
+	Roles        []string       `yaml:"roles"`
+	Applications []string       `yaml:"applications"`
 	Shell        struct {
 		Type string `yaml:"type"`
 	} `yaml:"shell"`
@@ -60,25 +60,25 @@ type Config struct {
 
 // InstallationPlan mirrors engine.packages.InstallationPlan (spec §14/§29).
 type InstallationPlan struct {
-	Version          string   `yaml:"version"`
-	Distribution     string   `yaml:"distribution"`
-	Architecture     string   `yaml:"architecture"`
-	Init             string   `yaml:"init"`
-	Kernel           string   `yaml:"kernel"`
-	BasePackages     []string `yaml:"base_packages"`
-	Packages         []string `yaml:"packages"`
-	AURPackages      []string `yaml:"aur_packages"`
-	FlatpakPackages  []string `yaml:"flatpak_packages"`
-	Services         []string `yaml:"services"`
-	Filesystem       string   `yaml:"filesystem"`
-	Bootloader       string   `yaml:"bootloader"`
-	Shell            string   `yaml:"shell"`
-	Display          string   `yaml:"display,omitempty"`
-	LoginManager     string   `yaml:"login_manager,omitempty"`
-	Desktop          string   `yaml:"desktop,omitempty"`
-	Roles            []string `yaml:"roles,omitempty"`
-	Hardware         []string `yaml:"hardware,omitempty"`
-	Sources          map[string]bool `yaml:"sources"`
+	Version         string          `yaml:"version"`
+	Distribution    string          `yaml:"distribution"`
+	Architecture    string          `yaml:"architecture"`
+	Init            string          `yaml:"init"`
+	Kernel          string          `yaml:"kernel"`
+	BasePackages    []string        `yaml:"base_packages"`
+	Packages        []string        `yaml:"packages"`
+	AURPackages     []string        `yaml:"aur_packages"`
+	FlatpakPackages []string        `yaml:"flatpak_packages"`
+	Services        []string        `yaml:"services"`
+	Filesystem      string          `yaml:"filesystem"`
+	Bootloader      string          `yaml:"bootloader"`
+	Shell           string          `yaml:"shell"`
+	Display         string          `yaml:"display,omitempty"`
+	LoginManager    string          `yaml:"login_manager,omitempty"`
+	Desktop         string          `yaml:"desktop,omitempty"`
+	Roles           []string        `yaml:"roles,omitempty"`
+	Hardware        []string        `yaml:"hardware,omitempty"`
+	Sources         map[string]bool `yaml:"sources"`
 }
 
 func LoadConfig(path string) (*Config, error) {
