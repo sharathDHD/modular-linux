@@ -4,6 +4,12 @@
 
 # Modular Linux
 
+> **This is the `netinstaller` branch** — the minimal online-installer
+> edition: a small live ISO with just boot + network drivers + a text
+> menu; everything you select is downloaded at install time. See
+> [README-netinstall.md](README-netinstall.md). The full live ISO with
+> the graphical builder lives on [main](https://github.com/sharathDHD/modular-linux).
+
 [![CI](https://github.com/sharathDHD/modular-linux/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sharathDHD/modular-linux/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org)
