@@ -117,6 +117,12 @@ n_profiles=$(find "$STAGING/profiles" -name '*.yaml' | wc -l)
 
 # ---- step 5: live environment (mkarchiso) ---------------------------------
 ml_step "Build live environment + ISO (mkarchiso)"
+echo "  note: two long, silent stages are normal:"
+echo "        - 'packages installed' stage downloads ~1-2 GB from mirrors"
+echo "        - 'Creating SquashFS image' compresses the live filesystem"
+echo "        (zstd; minutes on most machines. 0% CPU for >5 min = real hang:"
+echo "         usually missing loop devices — build on bare metal/WSL2, not"
+echo "         an unprivileged container)"
 # stale-cache fix: markers present but no artifact -> rebuild from scratch
 if compgen -G "$WORK/build.*" >/dev/null && ! compgen -G "$DIST/modular*.iso" >/dev/null; then
   echo "  (stale workdir without ISO artifact -> cleaning)"
