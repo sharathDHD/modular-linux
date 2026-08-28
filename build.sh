@@ -110,6 +110,12 @@ cp "$ROOT/examples/modular.yaml" "$STAGING/"
 mkdir -p "$PROFILE/airootfs/usr/local/bin"
 ln -sf /opt/modular/modular        "$PROFILE/airootfs/usr/local/bin/modular"
 ln -sf /opt/modular/modular-detect "$PROFILE/airootfs/usr/local/bin/modular-detect"
+# netinstall: console menu launcher (direct file exec; text_menu.py
+# bootstraps its own sys.path)
+printf '%s\n' '#!/bin/sh' \
+  'exec python3 /opt/modular/installer/menu/text_menu.py "$@"' \
+  > "$PROFILE/airootfs/usr/local/bin/modular-menu"
+chmod 755 "$PROFILE/airootfs/usr/local/bin/modular-menu"
 n_profiles=$(find "$STAGING/profiles" -name '*.yaml' | wc -l)
 [[ -x "$STAGING/modular" && "$n_profiles" -gt 50 ]] \
   && ml_ok "staged installer+engine+$n_profiles profiles" \
